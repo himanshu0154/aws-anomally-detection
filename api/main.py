@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from collections import deque
-from datetime import datetime
 import joblib
 import numpy as np
 import pandas as pd
@@ -17,13 +16,11 @@ app = FastAPI(title="SkyGuard AI Detection API")
 
 detector = joblib.load('../models/skyguard_detector_v2.joblib')
 
-# In-memory per-station rolling buffer (last 24 readings each)
 BUFFER_SIZE = 24
-station_buffers = {}
+reading_buffer = deque(maxlen=BUFFER_SIZE)
 
 
 class SensorReading(BaseModel):
-    station_id: str
     timestamp: str
     T2M: float
     RH2M: float
@@ -31,7 +28,6 @@ class SensorReading(BaseModel):
 
 
 def build_engineered_row(buffer):
-    """Same logic proven correct in the notebook simulation, adapted for a live buffer."""
     df = pd.DataFrame(buffer)
     current = df.iloc[-1]
 
@@ -41,7 +37,6 @@ def build_engineered_row(buffer):
         rh2m_diff = current['RH2M'] - previous['RH2M']
         ps_diff = current['PS'] - previous['PS']
     else:
-        # first-ever reading for this station - no prior value to diff against
         t2m_diff = rh2m_diff = ps_diff = 0.0
 
     ts = pd.to_datetime(current['timestamp'])
@@ -63,21 +58,16 @@ def build_engineered_row(buffer):
 
 @app.post("/detect")
 def detect_anomaly(reading: SensorReading):
-    if reading.station_id not in station_buffers:
-        station_buffers[reading.station_id] = deque(maxlen=BUFFER_SIZE)
+    reading_buffer.append(reading.dict())
 
-    buffer = station_buffers[reading.station_id]
-    buffer.append(reading.dict())
-
-    engineered_row = build_engineered_row(list(buffer))
-    recent_temps = np.array([r['T2M'] for r in list(buffer)[-7:-1]])
+    engineered_row = build_engineered_row(list(reading_buffer))
+    recent_temps = np.array([r['T2M'] for r in list(reading_buffer)[-7:-1]])
 
     result = detector.detect(engineered_row, recent_temps)
 
-    result['station_id'] = reading.station_id
     result['timestamp'] = reading.timestamp
-    result['readings_in_buffer'] = len(buffer)
-    result['fully_warmed_up'] = len(buffer) >= BUFFER_SIZE
+    result['readings_in_buffer'] = len(reading_buffer)
+    result['fully_warmed_up'] = len(reading_buffer) >= BUFFER_SIZE
 
     return result
 
