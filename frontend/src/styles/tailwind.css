@@ -25,34 +25,33 @@
 }
 
 :root {
-  --background: #0d1117;
-  --foreground: #e6edf3;
-  --primary: #3b9eff;
+  --background: #f4f2e8;
+  --foreground: #3a3a1f;
+  --primary: #6b7c32;
   --primary-foreground: #ffffff;
-  --secondary: #161b22;
-  --secondary-foreground: #8b949e;
-  --accent: #14b8a6;
+  --secondary: #e8e4d0;
+  --secondary-foreground: #5c5c3d;
+  --accent: #8a9a4a;
   --accent-foreground: #ffffff;
-  --muted: #21262d;
-  --muted-foreground: #8b949e;
-  --card: #161b22;
-  --card-foreground: #e6edf3;
-  --border: #30363d;
-  --input: #21262d;
-  --ring: #3b9eff;
+  --muted: #e0ddc5;
+  --muted-foreground: #7a7a5a;
+  --card: #faf8ef;
+  --card-foreground: #3a3a1f;
+  --border: #c9c5a0;
+  --input: #e8e4d0;
+  --ring: #6b7c32;
   --radius: 0.75rem;
   --font-sans: var(--font-dm-sans), 'DM Sans', sans-serif;
 
-  --positive: #3fb950;
-  --positive-bg: #1a3a22;
-  --warning: #d29922;
-  --warning-bg: #2d2000;
-  --danger: #f85149;
-  --danger-bg: #3d1a1a;
-  --info: #3b9eff;
-  --info-bg: #0d2a4a;
+  --positive: #4a7c3f;
+  --positive-bg: #e0ebd8;
+  --warning: #b7791f;
+  --warning-bg: #faf0dd;
+  --danger: #a33a3a;
+  --danger-bg: #f5ded9;
+  --info: #5c7a5c;
+  --info-bg: #e3ebe3;
 }
-
 @layer utilities {
   .font-tabular {
     font-variant-numeric: tabular-nums;
@@ -64,14 +63,12 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
-
   .card-elevated {
-    background-color: #1c2128;
+    background-color: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
   }
-
   .status-healthy {
     background-color: var(--positive-bg);
     color: var(--positive);
@@ -128,17 +125,16 @@
   }
 
   .gradient-temp {
-    background: linear-gradient(135deg, rgba(248, 81, 73, 0.12) 0%, rgba(22, 27, 34, 0) 60%);
+    background: linear-gradient(135deg, rgba(163, 58, 58, 0.10) 0%, rgba(244, 242, 232, 0) 60%);
   }
 
   .gradient-humidity {
-    background: linear-gradient(135deg, rgba(59, 158, 255, 0.12) 0%, rgba(22, 27, 34, 0) 60%);
+    background: linear-gradient(135deg, rgba(92, 122, 92, 0.10) 0%, rgba(244, 242, 232, 0) 60%);
   }
 
   .gradient-pressure {
-    background: linear-gradient(135deg, rgba(20, 184, 166, 0.12) 0%, rgba(22, 27, 34, 0) 60%);
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.10) 0%, rgba(244, 242, 232, 0) 60%);
   }
-
   .text-value-xl {
     font-size: 2.25rem;
     font-weight: 700;

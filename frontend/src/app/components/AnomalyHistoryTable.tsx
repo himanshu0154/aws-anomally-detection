@@ -22,6 +22,7 @@ const severityConfig: Record<string, { label: string; className: string; icon: R
   High: { label: 'High', className: 'status-critical', icon: AlertCircle },
   Medium: { label: 'Medium', className: 'status-warning', icon: AlertTriangle },
   Low: { label: 'Low', className: 'status-normal', icon: Info },
+  None: { label: 'None', className: 'status-normal', icon: CheckCircle2 },
 };
 
 const statusConfig: Record<string, string> = {
@@ -84,7 +85,7 @@ export default function AnomalyHistoryTable({ history }: AnomalyHistoryTableProp
             <tbody className="divide-y divide-border/40">
               {history.map((row) => {
                 const sevKey = row.severity.charAt(0).toUpperCase() + row.severity.slice(1).toLowerCase();
-                const sev = severityConfig[sevKey] || severityConfig.Medium;
+                const sev = severityConfig[sevKey] || severityConfig.None;
                 const SevIcon = sev.icon;
                 const isExpanded = expandedRowId === row.id;
                 return (

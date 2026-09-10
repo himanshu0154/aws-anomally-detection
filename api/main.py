@@ -129,24 +129,24 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
         _inference_times.append(round(elapsed_ms, 1))
 
     # Store in history (only anomalies)
-    if canonical['anomaly_status'] == 'anomaly':
-        with _lock:
-            history_events.appendleft({
-                'id': f"hist-{len(history_events) + 1:04d}",
-                'time': _format_time(canonical['timestamp']),
-                'date': _format_date(canonical['timestamp']),
-                'sensor': canonical['affected_sensor'],
-                'reading': _format_reading(canonical),
-                'type': _anomaly_type_label(canonical['anomaly_type']),
-                'raw_type': canonical['anomaly_type'],
-                'severity': canonical['severity'].capitalize(),
-                'status': 'Active',
-                'explanation': canonical['explanation'],
-                'recommendations': canonical['recommendations'],
-                'anomaly_score': canonical['anomaly_score'],
-                'corrected_value': canonical['corrected_value'],
-            })
-
+        # Store in history (all readings, normal and anomaly)
+    with _lock:
+        is_anomaly = canonical['anomaly_status'] == 'anomaly'
+        history_events.appendleft({
+            'id': f"hist-{len(history_events) + 1:04d}",
+            'time': _format_time(canonical['timestamp']),
+            'date': _format_date(canonical['timestamp']),
+            'sensor': canonical['affected_sensor'] if is_anomaly else 'none',
+            'reading': _format_reading(canonical),
+            'type': _anomaly_type_label(canonical['anomaly_type']) if is_anomaly else 'Normal',
+            'raw_type': canonical['anomaly_type'],
+            'severity': canonical['severity'].capitalize(),
+            'status': 'Active' if is_anomaly else 'Normal',
+            'explanation': canonical['explanation'],
+            'recommendations': canonical['recommendations'],
+            'anomaly_score': canonical['anomaly_score'],
+            'corrected_value': canonical['corrected_value'],
+        })
     # Store for chart
     with _lock:
         all_readings.append({
