@@ -85,22 +85,10 @@ _csv_index: int = 0
 def _load_csv():
     """Load historical data for simulation."""
     global _csv_data
-    # Prefer curated demo data if available
-    csv_path = DATA_DIR / 'demo_data.csv'
-    if not csv_path.exists():
-        csv_path = DATA_DIR / 'test_anomalies_full.csv'
-    if not csv_path.exists():
-        csv_path = DATA_DIR / 'weather_data.csv'
+    csv_path = DATA_DIR / 'test_processed.csv'
     df = pd.read_csv(csv_path)
-    # Normalize column names
-    if 'datetime' in df.columns:
+    if 'datetime' in df.columns and 'timestamp' not in df.columns:
         df = df.rename(columns={'datetime': 'timestamp'})
-    elif 'YEAR' in df.columns:
-        df['timestamp'] = pd.to_datetime(
-            df[['YEAR', 'MO', 'DY', 'HR']].rename(
-                columns={'YEAR': 'year', 'MO': 'month', 'DY': 'day', 'HR': 'hour'}
-            )
-        ).dt.strftime('%Y-%m-%dT%H:%M:%SZ')
     _csv_data = df
     return df
 
@@ -621,8 +609,26 @@ async def _simulator_loop():
 
 @app.on_event("startup")
 async def startup_event():
-    global _simulator_running
+    global _simulator_running, _csv_index
     _load_csv()
+
+    # Pre-seed the buffer with the first 24 readings so we start fully warmed up
+    df = _csv_data
+    for i in range(min(BUFFER_SIZE, len(df))):
+        row = df.iloc[i]
+        ts_raw = str(row.get('timestamp', ''))
+        try:
+            ts_iso = pd.to_datetime(ts_raw).strftime('%Y-%m-%dT%H:%M:%SZ')
+        except Exception:
+            ts_iso = ts_raw
+        reading_buffer.append({
+            'timestamp': ts_iso,
+            'T2M': float(row['T2M']) if pd.notna(row.get('T2M')) else None,
+            'RH2M': float(row['RH2M']) if pd.notna(row.get('RH2M')) else None,
+            'PS': float(row['PS']) if pd.notna(row.get('PS')) else None,
+        })
+    _csv_index = BUFFER_SIZE  # simulator starts from row 24 onward, not row 0
+
     _simulator_running = True
     asyncio.create_task(_simulator_loop())
 
