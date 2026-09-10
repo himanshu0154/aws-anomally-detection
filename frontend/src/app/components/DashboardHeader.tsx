@@ -2,7 +2,23 @@ import React from 'react';
 import AppLogo from '@/components/ui/AppLogo';
 import { Wifi, Clock, Cpu } from 'lucide-react';
 
-export default function DashboardHeader() {
+interface DashboardHeaderProps {
+  stationId: string;
+  lastUpdated: string;
+  modelName: string;
+}
+
+function formatTime(iso: string): string {
+  if (!iso) return '--:--:-- UTC';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }) + ' UTC';
+  } catch {
+    return iso.slice(11, 19) + ' UTC';
+  }
+}
+
+export default function DashboardHeader({ stationId, lastUpdated, modelName }: DashboardHeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-16 h-16 flex items-center justify-between gap-4">
@@ -28,7 +44,7 @@ export default function DashboardHeader() {
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted border border-border">
           <Cpu size={14} className="text-primary shrink-0" />
           <span className="text-xs font-mono font-semibold text-foreground tracking-wider">
-            AWS-MH-042
+            {stationId}
           </span>
         </div>
 
@@ -49,13 +65,13 @@ export default function DashboardHeader() {
           {/* Last updated */}
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock size={13} />
-            <span className="font-tabular hidden md:block">Updated 10:16:38 UTC</span>
+            <span className="font-tabular hidden md:block">Updated {formatTime(lastUpdated)}</span>
           </div>
 
           {/* Model tag */}
           <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded bg-muted border border-border">
-            <span className="text-xs text-muted-foreground font-medium">Model</span>
-            <span className="text-xs font-semibold text-accent">SkyAnomalyNet-v3</span>
+            <span className="text-xs text-muted-foreground font-medium">Algorithm</span>
+            <span className="text-xs font-semibold text-accent">IF + Residual</span>
           </div>
         </div>
       </div>

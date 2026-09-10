@@ -5,7 +5,6 @@ def pd_isna(val):
     import pandas as pd
     return pd.isna(val)
 
-
 def _scale_confidence(value, threshold, higher_is_worse=True):
     if higher_is_worse:
         excess = (value - threshold) / threshold
@@ -129,7 +128,8 @@ class SkyGuardDetector:
                 'confidence': confidence,
                 'reason': 'Sensor readings individually normal but jointly inconsistent',
                 'raw_reading': raw_reading,
-                'healed_reading': self._predict_healed_reading(row)
+                'healed_reading': self._predict_healed_reading(row),
+                'z_scores': {k: float(v) for k, v in z_scores.items()}
             }
 
         base_features = row[self.features].values
@@ -152,7 +152,8 @@ class SkyGuardDetector:
                 'confidence': confidence,
                 'reason': 'Unusual weather-sensor pattern detected',
                 'raw_reading': raw_reading,
-                'healed_reading': self._predict_healed_reading(row)
+                'healed_reading': self._predict_healed_reading(row),
+                'z_scores': {k: float(v) for k, v in z_scores.items()}
             }
 
         return {
@@ -164,4 +165,3 @@ class SkyGuardDetector:
             'raw_reading': raw_reading,
             'healed_reading': None
         }
-

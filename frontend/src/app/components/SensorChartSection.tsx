@@ -2,20 +2,24 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
+import type { SeriesPoint } from '@/hooks/useLiveDashboardData';
 
-// Backend integration point: replace mock data with WebSocket or REST polling
 const SensorChartClient = dynamic(
   () => import('./SensorChartClient'),
   { ssr: false }
 );
 
-export default function SensorChartSection() {
+interface SensorChartSectionProps {
+  series: SeriesPoint[];
+}
+
+export default function SensorChartSection({ series }: SensorChartSectionProps) {
   return (
     <div className="card-elevated p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-base font-semibold text-foreground">Real-Time Sensor Readings</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Last 2 hours — 5-minute intervals — AWS-MH-042</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Last 40 hours — hourly readings — AWS-MH-042</p>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <span className="flex items-center gap-1.5">
@@ -36,7 +40,7 @@ export default function SensorChartSection() {
           </span>
         </div>
       </div>
-      <SensorChartClient />
+      <SensorChartClient data={series} />
     </div>
   );
 }
