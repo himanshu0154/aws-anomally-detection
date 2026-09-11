@@ -1,14 +1,16 @@
 """
 SkyGuard AI Detection API
 
-Fixed backend with:
-- Correct model path resolution (Bug 1)
-- CORS middleware (Bug 2)
-- Optional sensor fields for communication_error detection (Bug 3)
+Deployment-ready backend:
+- Correct model path resolution from __file__
+- CORS middleware with production origin support
+- Optional sensor fields for communication_error detection
 - Live simulator from historical CSV data
 - Canonical response schema for all frontend components
+- Lifespan-based startup/shutdown (replaces deprecated on_event)
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -28,7 +30,7 @@ import threading
 warnings.filterwarnings('ignore')
 
 # ─── Path setup ───────────────────────────────────────────────────────────────
-# Bug 1 fix: resolve model path from __file__, not cwd
+# Resolve paths from __file__ so it works regardless of working directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 ML_DIR = BASE_DIR / 'ml'
 DATA_DIR = BASE_DIR / 'data'
@@ -38,25 +40,80 @@ sys.path.insert(0, str(ML_DIR))
 
 from detector import SkyGuardDetector  # noqa: E402
 
-# ─── App setup ────────────────────────────────────────────────────────────────
-app = FastAPI(title="SkyGuard AI Detection API")
+try:
+    from anomaly_classifier import classify_anomaly
+except ImportError:
+    classify_anomaly = None
 
-# Bug 2 fix: CORS middleware
+# ─── App setup ────────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app):
+    # Startup
+    global _simulator_running, _csv_index, detector
+    _load_csv()
+
+    # Load detector (with fallback for missing model)
+    if MODEL_PATH.exists():
+        detector = joblib.load(MODEL_PATH)
+    else:
+        print(f"WARNING: Model file not found at {MODEL_PATH}")
+        print("Detection will run with default/empty model")
+
+    # Pre-seed the buffer with the first 24 readings so we start fully warmed up
+    df = _csv_data
+    if df is not None and len(df) > 0:
+        for i in range(min(BUFFER_SIZE, len(df))):
+            row = df.iloc[i]
+            ts_raw = str(row.get('timestamp', ''))
+            try:
+                ts_iso = pd.to_datetime(ts_raw).strftime('%Y-%m-%dT%H:%M:%SZ')
+            except Exception:
+                ts_iso = ts_raw
+            reading_buffer.append({
+                'timestamp': ts_iso,
+                'T2M': float(row['T2M']) if pd.notna(row.get('T2M')) else None,
+                'RH2M': float(row['RH2M']) if pd.notna(row.get('RH2M')) else None,
+                'PS': float(row['PS']) if pd.notna(row.get('PS')) else None,
+            })
+        _csv_index = BUFFER_SIZE  # simulator starts from row 24 onward
+
+    _simulator_running = True
+    asyncio.create_task(_simulator_loop())
+    yield
+    # Shutdown
+    global _simulator_running
+    _simulator_running = False
+
+app = FastAPI(title="SkyGuard AI Detection API", lifespan=lifespan)
+
+# CORS middleware — supports both local dev and production deployments
+# Set ALLOWED_ORIGINS env var to a comma-separated list of frontend URLs
+# e.g. "https://your-app.vercel.app,https://your-app.onrender.com"
 ALLOWED_ORIGINS = [
-    "http://localhost:4028",
-    "http://127.0.0.1:4028",
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:4028,http://127.0.0.1:4028,http://localhost:3000"
+    ).split(",")
+    if origin.strip()
 ]
+
+# Also allow all origins in development for convenience
+if os.getenv("ENVIRONMENT") != "production" and "*" not in ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS.append("*")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # ─── Load detector ────────────────────────────────────────────────────────────
-detector: SkyGuardDetector = joblib.load(MODEL_PATH)
+detector: Optional[SkyGuardDetector] = None
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 BUFFER_SIZE = 24
@@ -117,10 +174,35 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
         recent_temps_list = [r['T2M'] for r in list(reading_buffer) if r['T2M'] is not None]
         recent_temps = np.array(recent_temps_list) if recent_temps_list else np.array([])
 
-        result = detector.detect(engineered_row, recent_temps)
+        if detector is not None:
+            result = detector.detect(engineered_row, recent_temps)
+        else:
+            result = {
+                'status': 'normal', 'type': 'normal', 'severity': 'none',
+                'confidence': None, 'reason': 'Model not loaded',
+                'raw_reading': reading_dict, 'healed_reading': None
+            }
 
     # Build canonical response
     canonical = _map_to_canonical(result, reading_dict)
+
+    # Call Gemini classifier if anomaly detected
+    gemini_classification = None
+    if canonical['anomaly_status'] == 'anomaly' and classify_anomaly is not None:
+        try:
+            with _lock:
+                recent = list(reading_buffer)
+            gemini_classification = classify_anomaly(
+                reading=reading_dict,
+                detector_result=result,
+                recent_readings=recent,
+            )
+            canonical['gemini_classification'] = gemini_classification
+        except Exception as e:
+            gemini_classification = None
+            canonical['gemini_classification'] = None
+    else:
+        canonical['gemini_classification'] = None
 
     # Record inference time
     t1 = datetime.utcnow()
@@ -146,6 +228,7 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
             'recommendations': canonical['recommendations'],
             'anomaly_score': canonical['anomaly_score'],
             'corrected_value': canonical['corrected_value'],
+            'gemini_classification': gemini_classification,
         })
     # Store for chart
     with _lock:
@@ -607,38 +690,6 @@ async def _simulator_loop():
         await asyncio.sleep(3.5)  # ~3.5 seconds between ticks
 
 
-@app.on_event("startup")
-async def startup_event():
-    global _simulator_running, _csv_index
-    _load_csv()
-
-    # Pre-seed the buffer with the first 24 readings so we start fully warmed up
-    df = _csv_data
-    for i in range(min(BUFFER_SIZE, len(df))):
-        row = df.iloc[i]
-        ts_raw = str(row.get('timestamp', ''))
-        try:
-            ts_iso = pd.to_datetime(ts_raw).strftime('%Y-%m-%dT%H:%M:%SZ')
-        except Exception:
-            ts_iso = ts_raw
-        reading_buffer.append({
-            'timestamp': ts_iso,
-            'T2M': float(row['T2M']) if pd.notna(row.get('T2M')) else None,
-            'RH2M': float(row['RH2M']) if pd.notna(row.get('RH2M')) else None,
-            'PS': float(row['PS']) if pd.notna(row.get('PS')) else None,
-        })
-    _csv_index = BUFFER_SIZE  # simulator starts from row 24 onward, not row 0
-
-    _simulator_running = True
-    asyncio.create_task(_simulator_loop())
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    global _simulator_running
-    _simulator_running = False
-
-
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -668,6 +719,7 @@ def get_live():
             'sensor_health': {},
             'recommendations': [],
             'raw_reading': {'T2M': None, 'RH2M': None, 'PS': None},
+            'gemini_classification': None,
             'model_meta': {
                 'readings_in_buffer': 0,
                 'fully_warmed_up': False,

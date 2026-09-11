@@ -67,8 +67,8 @@ export default function SensorChartClient({ data }: SensorChartClientProps) {
       <ComposedChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
         <defs>
           <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--danger)" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="var(--danger)" stopOpacity={0} />
+            <stop offset="5%" stopColor="#991B1B" stopOpacity={0.15} />
+            <stop offset="95%" stopColor="#991B1B" stopOpacity={0} />
           </linearGradient>
         </defs>
 
@@ -116,10 +116,10 @@ export default function SensorChartClient({ data }: SensorChartClientProps) {
         <Line
           type="monotone"
           dataKey="pressureScaled"
-          stroke="var(--accent)"
+          stroke="#166534"
           strokeWidth={1.5}
           dot={false}
-          activeDot={{ r: 4, fill: 'var(--accent)' }}
+          activeDot={{ r: 4, fill: '#166534' }}
           name="pressureScaled"
           strokeOpacity={0.8}
           connectNulls
@@ -129,10 +129,10 @@ export default function SensorChartClient({ data }: SensorChartClientProps) {
         <Line
           type="monotone"
           dataKey="humidity"
-          stroke="var(--primary)"
+          stroke="#2563EB"
           strokeWidth={1.5}
           dot={false}
-          activeDot={{ r: 4, fill: 'var(--primary)' }}
+          activeDot={{ r: 4, fill: '#2563EB' }}
           name="humidity"
           strokeOpacity={0.9}
           connectNulls
@@ -142,10 +142,10 @@ export default function SensorChartClient({ data }: SensorChartClientProps) {
         <Line
           type="monotone"
           dataKey="temp"
-          stroke="var(--danger)"
+          stroke="#991B1B"
           strokeWidth={2.5}
           dot={false}
-          activeDot={{ r: 5, fill: 'var(--danger)' }}
+          activeDot={{ r: 5, fill: '#991B1B' }}
           name="temp"
           connectNulls
         />
