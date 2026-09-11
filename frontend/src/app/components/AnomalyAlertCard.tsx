@@ -221,7 +221,7 @@ export default function AnomalyAlertCard({ live, isWarmingUp, history }: Anomaly
           {/* AI Reasoning */}
           <div className="mt-4 p-3 rounded-lg bg-muted/40 border border-border/60">
             <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase tracking-wider">
-              AI Reasoning
+              Detection Reasoning
             </p>              <p className="text-sm text-foreground leading-relaxed">
               {displayAnomaly.explanation}
             </p>

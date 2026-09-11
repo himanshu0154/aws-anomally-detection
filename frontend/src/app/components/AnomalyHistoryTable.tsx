@@ -83,18 +83,18 @@ export default function AnomalyHistoryTable({ history }: AnomalyHistoryTableProp
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {history.map((row) => {
+              {history.map((row, index) => {
                 const sevKey = row.severity.charAt(0).toUpperCase() + row.severity.slice(1).toLowerCase();
                 const sev = severityConfig[sevKey] || severityConfig.None;
                 const SevIcon = sev.icon;
-                const isExpanded = expandedRowId === row.id;
+                const isExpanded = expandedRowId === String(index);
                 return (
                   <React.Fragment key={row.id}>
                     <tr
                       className={`group transition-colors cursor-pointer ${
                         row.status === 'Active' ? 'bg-danger/5 hover:bg-danger/10' : 'hover:bg-muted/30'
                       }`}
-                      onClick={() => toggleRow(row.id)}
+                      onClick={() => toggleRow(String(index))}
                     >
                       {/* Expand chevron */}
                       <td className="py-3 pr-4 w-8">
@@ -169,7 +169,7 @@ export default function AnomalyHistoryTable({ history }: AnomalyHistoryTableProp
                                   <Brain size={14} className="text-primary mt-0.5 shrink-0" />
                                   <div>
                                     <p className="text-xs font-semibold text-primary mb-1 uppercase tracking-wider">
-                                      AI Reasoning
+                                      Detection Reasoning
                                     </p>
                                     <p className="text-xs text-foreground leading-relaxed">
                                       {row.explanation}
