@@ -46,6 +46,8 @@ except ImportError:
     classify_anomaly = None
 
 # ─── App setup ────────────────────────────────────────────────────────────────
+_simulator_running = False
+detector = None
 
 @asynccontextmanager
 async def lifespan(app):
@@ -82,7 +84,6 @@ async def lifespan(app):
     asyncio.create_task(_simulator_loop())
     yield
     # Shutdown
-    global _simulator_running
     _simulator_running = False
 
 app = FastAPI(title="SkyGuard AI Detection API", lifespan=lifespan)
@@ -649,7 +650,6 @@ def _anomaly_type_label(anomaly_type):
 
 
 # ─── Background simulator ─────────────────────────────────────────────────────
-_simulator_running = False
 
 
 async def _simulator_tick():
