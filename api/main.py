@@ -130,6 +130,7 @@ class SensorReading(BaseModel):
 # ─── Global state ─────────────────────────────────────────────────────────────
 reading_buffer: deque = deque(maxlen=BUFFER_SIZE)
 history_events: deque = deque(maxlen=500)  # anomaly events only
+_history_counter = 0
 all_readings: deque = deque(maxlen=1000)   # all readings for chart
 latest_event: Optional[Dict[str, Any]] = None
 _inference_times: deque = deque(maxlen=20)
@@ -157,7 +158,7 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
     Feed a raw reading through the detector and return a canonical response.
     This is the single shared function used by both the simulator and POST /detect.
     """
-    global latest_event
+    global latest_event, _history_counter
 
     t0 = datetime.utcnow()
 
@@ -215,6 +216,7 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
         # Store in history (all readings, normal and anomaly)
     with _lock:
         is_anomaly = canonical['anomaly_status'] == 'anomaly'
+        _history_counter += 1
         history_events.appendleft({
             'id': f"hist-{len(history_events) + 1:04d}",
             'time': _format_time(canonical['timestamp']),
