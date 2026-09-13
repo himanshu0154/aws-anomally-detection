@@ -142,7 +142,10 @@ export function sortForExplanations(history: AnomalyEvent[]): AnomalyEvent[] {
     .slice()
     .sort((a, b) => {
       if (isUnresolved(a) !== isUnresolved(b)) return isUnresolved(a) ? -1 : 1;
-      return b.timestamp.localeCompare(a.timestamp);
+      const aTimestamp = a.timestamp ?? "";
+      const bTimestamp = b.timestamp ?? "";
+
+return String(bTimestamp).localeCompare(String(aTimestamp));
     });
 }
 
