@@ -124,7 +124,7 @@ BUFFER_SIZE = 24
 # stays stable, and nothing in the UI renders it.
 STATION_ID = ""
 HISTORY_MAX = 5000   # bounded in-process event store; oldest records roll off first
-
+# commnted
 # ─── Pydantic models ─────────────────────────────────────────────────────────
 class SensorReading(BaseModel):
     timestamp: str
