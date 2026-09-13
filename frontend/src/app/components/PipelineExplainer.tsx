@@ -16,6 +16,7 @@ import {
   Target,
   Wrench,
 } from 'lucide-react';
+import { InView } from '@/components/ui/in-view';
 
 interface PipelineStep {
   id: string;
@@ -250,44 +251,57 @@ export default function PipelineExplainer() {
         {STEPS.map((step) => {
           const Icon = step.icon;
           return (
-            <article key={step.id} id={step.id} className="card-elevated p-5">
-              <div className="flex gap-4">
-                <div className="flex shrink-0 flex-col items-center gap-2">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/30 bg-primary/10">
-                    <Icon size={20} className="text-primary" />
+            // Each step is its own reveal group, so a twelve-card walkthrough
+            // animates card by card as it is scrolled rather than all at once off
+            // the top of the section.
+            <InView key={step.id}>
+              <article id={step.id} className="card-elevated p-5">
+                <div className="flex gap-4">
+                  <div className="flex shrink-0 flex-col items-center gap-2">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/30 bg-primary/10">
+                      <Icon size={20} className="text-primary" />
+                    </div>
+                    <span className="font-tabular text-xs font-bold text-muted-foreground">
+                      {String(step.step).padStart(2, '0')}
+                    </span>
                   </div>
-                  <span className="font-tabular text-xs font-bold text-muted-foreground">
-                    {String(step.step).padStart(2, '0')}
-                  </span>
-                </div>
 
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-base font-semibold text-foreground">{step.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-foreground/80">{step.simple}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-semibold text-foreground">{step.title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-foreground/80">
+                      {step.simple}
+                    </p>
 
-                  <details className="group mt-3">
-                    <summary className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      <ArrowDown size={12} className="transition-transform group-open:rotate-180" />
-                      Technical details
-                    </summary>
-                    <ul className="mt-3 space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
-                      {step.technical.map((line, index) => (
-                        <li
-                          key={`${step.id}-technical-${index}`}
-                          className="flex items-start gap-2 text-xs leading-relaxed text-foreground/80"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary"
-                          />
-                          <span>{line}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
+                    <details className="group mt-3">
+                      <summary
+                        data-cursor="Technical details"
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <ArrowDown
+                          size={12}
+                          className="transition-transform group-open:rotate-180"
+                        />
+                        Technical details
+                      </summary>
+                      <ul className="mt-3 space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
+                        {step.technical.map((line, index) => (
+                          <li
+                            key={`${step.id}-technical-${index}`}
+                            className="flex items-start gap-2 text-xs leading-relaxed text-foreground/80"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary"
+                            />
+                            <span>{line}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </div>
                 </div>
-              </div>
-            </article>
+              </article>
+            </InView>
           );
         })}
       </section>

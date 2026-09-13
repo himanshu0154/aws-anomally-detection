@@ -13,7 +13,10 @@ import {
 } from 'lucide-react';
 import type { LiveReading } from '@/types/skyguard';
 import { anomalyTypeLabel, formatClock, readingValue } from '@/lib/anomaly';
+import { BorderTrail } from '@/components/ui/border-trail';
 import { SquigglyText } from '@/components/ui/squiggly-text';
+import { TextShimmer } from '@/components/ui/text-shimmer';
+import { TransitionPanel } from '@/components/ui/transition-panel';
 
 interface AnomalyAlertCardProps {
   live: LiveReading;
@@ -67,6 +70,7 @@ export default function AnomalyAlertCard({
           {unresolvedCount > 0 ? (
             <Link
               href="/explanations"
+              data-cursor="Open queue"
               className="inline-flex items-center gap-1.5 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-semibold text-danger transition-colors hover:bg-danger/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {unresolvedCount} unresolved {unresolvedCount === 1 ? 'anomaly' : 'anomalies'}
@@ -96,7 +100,18 @@ export default function AnomalyAlertCard({
     live.corrected_value?.pressure;
 
   return (
-    <div className="anomaly-pulse overflow-hidden rounded-xl border border-danger/50 bg-card">
+    <div className="anomaly-pulse relative overflow-hidden rounded-xl border border-danger/50 bg-card">
+      {/*
+        The one surface on the dashboard that carries the border trail: the comet
+        keeps travelling while this reading is still anomalous, beside the card's
+        existing pulse. A calm card deliberately has neither.
+      */}
+      <BorderTrail
+        className="bg-gradient-to-l from-danger/0 via-danger to-danger/0"
+        size={160}
+        duration={6}
+        radius="calc(var(--radius) + 0.25rem)"
+      />
       <div className="flex items-center justify-between gap-3 border-b border-danger/30 bg-danger/10 px-5 py-4">
         <div className="flex min-w-0 items-center gap-3">
           <div className="rounded-lg bg-danger/20 p-2">
@@ -127,7 +142,14 @@ export default function AnomalyAlertCard({
                 {severityLabelText}
               </span>
               <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                LIVE
+                {/* LIVE is a state that is still running, so the word carries the sweep. */}
+                <TextShimmer
+                  baseColor="var(--muted-foreground)"
+                  highlightColor="var(--danger)"
+                  duration={1.5}
+                >
+                  LIVE
+                </TextShimmer>
               </span>
             </div>
             <p className="mt-0.5 text-xs text-danger/70">
@@ -149,7 +171,13 @@ export default function AnomalyAlertCard({
         </button>
       </div>
 
-      {expanded && (
+      {/*
+        A panel switch rather than a mount/unmount, so the details slide in and
+        out instead of appearing. Index 0 is the collapsed state: an empty layer
+        that keeps the card's height honest while the body leaves.
+      */}
+      <TransitionPanel activeIndex={expanded ? 1 : 0} transition={{ duration: 0.22 }}>
+        <div />
         <div className="px-5 py-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <div>
@@ -212,6 +240,7 @@ export default function AnomalyAlertCard({
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href="/explanations"
+              data-cursor="Open explanation"
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Open explanation &amp; recommendations
@@ -219,6 +248,7 @@ export default function AnomalyAlertCard({
             </Link>
             <Link
               href="/root-cause"
+              data-cursor="Root causes"
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Root-cause analysis
@@ -226,7 +256,7 @@ export default function AnomalyAlertCard({
             </Link>
           </div>
         </div>
-      )}
+      </TransitionPanel>
     </div>
   );
 }

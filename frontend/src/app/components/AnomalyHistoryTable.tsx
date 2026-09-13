@@ -11,6 +11,8 @@ import {
   formatDateTime,
   severityLabel,
 } from '@/lib/anomaly';
+import { useRevealGroup } from '@/components/ui/in-view';
+import { TextShimmer } from '@/components/ui/text-shimmer';
 import { urgencyClass } from './ExplanationRecommendation';
 
 interface AnomalyHistoryTableProps {
@@ -169,7 +171,9 @@ function EventDetails({
           {resolving && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
               <Loader2 size={12} className="animate-spin" />
-              Saving…
+              <TextShimmer baseColor="var(--muted-foreground)" highlightColor="var(--primary)">
+                Saving…
+              </TextShimmer>
             </span>
           )}
         </div>
@@ -185,11 +189,18 @@ export default function AnomalyHistoryTable({
   isResolving = () => false,
 }: AnomalyHistoryTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // The log sits below the summary tiles and the filter bar, so it reveals on scroll.
+  const reveal = useRevealGroup<HTMLDivElement>({ stagger: 0.07 });
   const toggle = (eventId: string) =>
     setExpandedId((current) => (current === eventId ? null : eventId));
 
   return (
-    <div className="card-elevated p-5">
+    <div
+      ref={reveal.ref}
+      {...reveal.revealProps}
+      style={reveal.revealStyle}
+      className="reveal-group card-elevated p-5"
+    >
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <History size={17} className="text-muted-foreground" />
@@ -273,6 +284,7 @@ export default function AnomalyHistoryTable({
                         aria-expanded={expanded}
                         aria-controls={`event-detail-${event.id}`}
                         aria-label={`${expanded ? 'Hide' : 'Show'} details for ${event.id}`}
+                        data-cursor={expanded ? 'Hide details' : 'Show details'}
                         className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -332,6 +344,7 @@ export default function AnomalyHistoryTable({
                   aria-expanded={expanded}
                   aria-controls={`event-detail-mobile-${event.id}`}
                   aria-label={`${expanded ? 'Hide' : 'Show'} details for ${event.id}`}
+                  data-cursor={expanded ? 'Hide details' : 'Show details'}
                   className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}

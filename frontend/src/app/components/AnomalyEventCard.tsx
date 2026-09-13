@@ -11,6 +11,7 @@ import {
   formatDateTime,
   severityLabel,
 } from '@/lib/anomaly';
+import { TextShimmer } from '@/components/ui/text-shimmer';
 import { ExplanationBody } from './ExplanationRecommendation';
 
 interface AnomalyEventCardProps {
@@ -133,6 +134,7 @@ export default function AnomalyEventCard({ event, resolving, onResolve }: Anomal
                   setConfirming(false);
                   onResolve(event);
                 }}
+                data-cursor="Confirm"
                 className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Confirm resolution
@@ -146,7 +148,11 @@ export default function AnomalyEventCard({ event, resolving, onResolve }: Anomal
               </button>
             </div>
           ) : (
-            <label className="flex cursor-pointer items-center gap-3">
+            <label
+              className="flex cursor-pointer items-center gap-3"
+              data-cursor={resolved ? 'Resolved' : 'Resolve'}
+              data-cursor-tone={resolved ? 'positive' : 'danger'}
+            >
               <input
                 type="checkbox"
                 checked={resolved}
@@ -166,7 +172,9 @@ export default function AnomalyEventCard({ event, resolving, onResolve }: Anomal
                   role="status"
                 >
                   <Loader2 size={13} className="animate-spin" />
-                  Saving…
+                  <TextShimmer baseColor="var(--muted-foreground)" highlightColor="var(--primary)">
+                    Saving…
+                  </TextShimmer>
                 </span>
               )}
             </label>

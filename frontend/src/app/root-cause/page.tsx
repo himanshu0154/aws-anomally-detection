@@ -10,6 +10,8 @@ import {
   flaggedCauseKey,
 } from '../components/RootCauseClassification';
 import { EmptyBlock, LoadingBlock } from '../components/StateFeedback';
+import { AnimatedBackground } from '@/components/ui/animated-background';
+import { useRevealGroup } from '@/components/ui/in-view';
 import { useLiveDashboardData } from '@/hooks/useLiveDashboardData';
 import { anomalyTypeLabel, latestUnresolved } from '@/lib/anomaly';
 
@@ -17,6 +19,10 @@ export default function RootCausePage() {
   const { live, history, loading } = useLiveDashboardData();
   const currentKey = flaggedCauseKey(live.anomaly_type);
   const latestOpen = useMemo(() => latestUnresolved(history) ?? null, [history]);
+
+  // The two blocks below the current reading reveal themselves on scroll.
+  const sharesReveal = useRevealGroup<HTMLDivElement>({ stagger: 0.08 });
+  const classesReveal = useRevealGroup<HTMLElement>({ stagger: 0.08 });
 
   return (
     <div className="space-y-6">
@@ -79,7 +85,12 @@ export default function RootCausePage() {
             />
           </section>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div
+            ref={sharesReveal.ref}
+            {...sharesReveal.revealProps}
+            style={sharesReveal.revealStyle}
+            className="reveal-group grid grid-cols-1 gap-6 lg:grid-cols-2"
+          >
             {/* Latest unresolved event, with its stored shares */}
             <section aria-labelledby="latest-event-shares" className="card-elevated p-5">
               <h2 id="latest-event-shares" className="text-base font-semibold text-foreground">
@@ -103,6 +114,7 @@ export default function RootCausePage() {
                   />
                   <Link
                     href="/explanations"
+                    data-cursor="Open queue"
                     className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-primary transition-opacity hover:opacity-80"
                   >
                     Open this event in the explanation queue
@@ -165,7 +177,13 @@ export default function RootCausePage() {
           </div>
 
           {/* Class reference */}
-          <section aria-labelledby="class-reference">
+          <section
+            ref={classesReveal.ref}
+            {...classesReveal.revealProps}
+            style={classesReveal.revealStyle}
+            aria-labelledby="class-reference"
+            className="reveal-group"
+          >
             <div className="mb-3">
               <h2 id="class-reference" className="text-base font-semibold text-foreground">
                 Root-cause classes
@@ -178,13 +196,25 @@ export default function RootCausePage() {
                 What each hypothesis means, and which signal in the pipeline can raise it.
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {/*
+              The class tiles are reference cards, not controls — the highlight is
+              the app's shared hover language rather than an affordance, exactly as
+              in the component this was ported from.
+            */}
+            <AnimatedBackground
+              containerClassName="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+              className="rounded bg-primary/10"
+              layer="above"
+              enableHover
+              transition={{ duration: 0.4 }}
+            >
               {ROOT_CAUSES.map((cause) => {
                 const Icon = cause.icon;
                 const isFlagged = currentKey === cause.key;
                 return (
                   <article
                     key={cause.key}
+                    data-id={cause.key}
                     className={`card-elevated flex h-full flex-col p-4 ${
                       isFlagged ? 'border-danger/40' : ''
                     }`}
@@ -213,7 +243,7 @@ export default function RootCausePage() {
                   </article>
                 );
               })}
-            </div>
+            </AnimatedBackground>
           </section>
         </>
       )}

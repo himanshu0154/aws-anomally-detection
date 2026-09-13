@@ -1,0 +1,144 @@
+$ next dev -p 4028
+Error processing file src\app\components\DetectionFlowDiagram.tsx: [SyntaxError: Unterminated JSX contents. (131:10)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnterminatedJsxContent',
+  loc: [Position],
+  pos: 4712,
+  syntaxPlugin: 'jsx'
+}
+Error processing file src\app\components\DetectionFlowDiagram.tsx: [SyntaxError: Unterminated JSX contents. (131:10)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnterminatedJsxContent',
+  loc: [Position],
+  pos: 4712,
+  syntaxPlugin: 'jsx'
+}
+ ⨯ ./src/app/components/DetectionFlowDiagram.tsx
+  [31mx[0m Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+     ,-[[36;1;4mC:\Users\iuser\Desktop\aws-anomally-detection\frontend\src\app\components\DetectionFlowDiagram.tsx[0m:133:1]
+ [2m130[0m |       </div>
+ [2m131[0m |     </div>
+ [2m132[0m |   );
+ [2m133[0m | }
+     : [35;1m^[0m
+     `----
+  [31mx[0m Unexpected eof
+     ,-[[36;1;4mC:\Users\iuser\Desktop\aws-anomally-detection\frontend\src\app\components\DetectionFlowDiagram.tsx[0m:133:4]
+ [2m131[0m |     </div>
+ [2m132[0m |   );
+ [2m133[0m | }
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/components/DetectionFlowDiagram.tsx
+./src/app/page.tsx
+Error processing file src\app\components\SplashScreen.tsx: [SyntaxError: Unexpected token (134:14)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnexpectedToken',
+  loc: [Position],
+  pos: 5322,
+  syntaxPlugin: undefined
+}
+Error processing file src\app\components\SplashScreen.tsx: [SyntaxError: Unexpected token (134:14)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnexpectedToken',
+  loc: [Position],
+  pos: 5322,
+  syntaxPlugin: undefined
+}
+ ⨯ ./src/app/components/SplashScreen.tsx
+  [31mx[0m Expected '</', got '}'
+     ,-[[36;1;4mC:\Users\iuser\Desktop\aws-anomally-detection\frontend\src\app\components\SplashScreen.tsx[0m:134:1]
+ [2m131[0m |               screen for the length of a startup, not an inline status word, and
+ [2m132[0m |               the roll gives that wait somewhere to travel — the wave front crosses
+ [2m133[0m |               the line in about as long as the splash lasts.
+ [2m134[0m |             */}
+     : [35;1m              ^[0m
+ [2m135[0m |             <TextShimmerWave
+ [2m136[0m |               baseColor="var(--foreground)"
+ [2m136[0m |               highlightColor="var(--accent)"
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/components/SplashScreen.tsx
+./src/app/components/AppShell.tsx
+Error processing file src\app\components\SplashScreen.tsx: [SyntaxError: Unexpected token (134:14)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnexpectedToken',
+  loc: [Position],
+  pos: 5322,
+  syntaxPlugin: undefined
+}
+Error processing file src\app\components\SplashScreen.tsx: [SyntaxError: Unexpected token (134:14)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnexpectedToken',
+  loc: [Position],
+  pos: 5322,
+  syntaxPlugin: undefined
+}
+ ⨯ ./src/app/components/SplashScreen.tsx
+  [31mx[0m Expected '</', got '}'
+     ,-[[36;1;4mC:\Users\iuser\Desktop\aws-anomally-detection\frontend\src\app\components\SplashScreen.tsx[0m:134:1]
+ [2m131[0m |               screen for the length of a startup, not an inline status word, and
+ [2m132[0m |               the roll gives that wait somewhere to travel — the wave front crosses
+ [2m133[0m |               the line in about as long as the splash lasts.
+ [2m134[0m |             */}
+     : [35;1m              ^[0m
+ [2m135[0m |             <TextShimmerWave
+ [2m136[0m |               baseColor="var(--foreground)"
+ [2m136[0m |               highlightColor="var(--accent)"
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/components/SplashScreen.tsx
+./src/app/components/AppShell.tsx
+Error processing file src\app\components\SplashScreen.tsx: [SyntaxError: Unexpected token (134:14)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnexpectedToken',
+  loc: [Position],
+  pos: 5322,
+  syntaxPlugin: undefined
+}
+Error processing file src\app\components\SplashScreen.tsx: [SyntaxError: Unexpected token (134:14)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnexpectedToken',
+  loc: [Position],
+  pos: 5322,
+  syntaxPlugin: undefined
+}
+ ⨯ ./src/app/components/SplashScreen.tsx
+  [31mx[0m Expected '</', got '}'
+     ,-[[36;1;4mC:\Users\iuser\Desktop\aws-anomally-detection\frontend\src\app\components\SplashScreen.tsx[0m:134:1]
+ [2m131[0m |               screen for the length of a startup, not an inline status word, and
+ [2m132[0m |               the roll gives that wait somewhere to travel — the wave front crosses
+ [2m133[0m |               the line in about as long as the splash lasts.
+ [2m134[0m |             */}
+     : [35;1m              ^[0m
+ [2m135[0m |             <TextShimmerWave
+ [2m136[0m |               baseColor="var(--foreground)"
+ [2m136[0m |               highlightColor="var(--accent)"
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/components/SplashScreen.tsx
+./src/app/components/AppShell.tsx
+Error processing file src\app\components\SplashScreen.tsx: [SyntaxError: Unexpected token (134:14)] {
+  code: 'BABEL_PARSER_SYNTAX_ERROR',
+  reasonCode: 'UnexpectedToken',
+  loc: [Position],
+  pos: 5322,
+  syntaxPlugin: undefined
+}
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.

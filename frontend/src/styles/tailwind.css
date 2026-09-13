@@ -256,6 +256,43 @@
       animation: none;
       stroke-dashoffset: 0;
     }
+
+    /* The comet stays where it is — a static accent rather than vanished state. */
+    .border-trail-track {
+      animation: none;
+    }
+  }
+
+  /*
+    Border trail (src/components/ui/border-trail.tsx). The comet is a bar centred
+    inside a full-size, transparent track whose centre rides the container's
+    perimeter, so one CSS animation on `offset-distance` is the whole effect: no
+    React work and no animation-frame callback per lap.
+  */
+  .border-trail-track {
+    animation-name: borderTrailTravel;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  @keyframes borderTrailTravel {
+    from {
+      offset-distance: 0%;
+    }
+    to {
+      offset-distance: 100%;
+    }
+  }
+
+  /*
+    `offset-path` basic shapes are the one part of the trail that is not
+    universally available. Without them the comet would sit in the middle of the
+    container, which reads as a rendering glitch, so hide it instead.
+  */
+  @supports not (offset-path: rect(0 0 0 0)) {
+    .border-trail-track {
+      display: none;
+    }
   }
 
   .gradient-temp {
@@ -294,5 +331,300 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 2px;
+  }
+}
+
+/*
+  Labelled cursor (src/components/ui/cursor.tsx).
+
+  Unlayered on purpose: a compound selector like this one has no single class for
+  Tailwind's `@layer utilities` pass to key on, and it must be emitted whether or
+  not anything scans it. Specificity (0,2,1) is also what lets it beat
+  `cursor-pointer` on an element that carries it.
+
+  `labeled-cursor` is set on <html> only while the custom cursor is actually
+  running (fine pointer, motion allowed), so a touch device or a reduced-motion
+  reader keeps the native pointer everywhere.
+*/
+html.labeled-cursor [data-cursor] {
+  cursor: none;
+}
+
+/*
+  Scroll reveal (src/components/ui/in-view.tsx).
+
+  The observer only flips `data-in-view` on the group; the reveal itself lives
+  here, so a group of any size costs one attribute write. `idle` — the state
+  before the group has been measured, and the state of anything already on screen
+  — is deliberately unstyled: nothing is hidden unless the component confirmed
+  the group is still below the fold.
+
+  The visible state is an **animation with `fill-mode: backwards`**, not a
+  transition: it needs no `transition-property` of its own, so it cannot clobber
+  a child's own transitions (a card's hover colours, say), `backwards` fill covers
+  the stagger delay, and once it finishes the element falls back to its natural
+  styles instead of holding a pinned `transform: none` that would fight a hover
+  effect.
+*/
+.reveal-group[data-in-view='hidden'] > * {
+  opacity: 0;
+  transform: translateY(var(--reveal-shift, 14px)) scale(var(--reveal-scale, 0.98));
+}
+
+.reveal-group[data-in-view='visible'] > * {
+  animation-name: revealIn;
+  animation-duration: var(--reveal-duration, 520ms);
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: backwards;
+  animation-delay: calc(var(--reveal-stagger, 0.09s) * var(--reveal-index, 0));
+}
+
+@keyframes revealIn {
+  from {
+    opacity: 0;
+    transform: translateY(var(--reveal-shift, 14px)) scale(var(--reveal-scale, 0.98));
+  }
+}
+
+/*
+  Stagger index for the first twelve children, written out rather than cloned in
+  per item: twelve rules cover every reveal group in the app, and the thirteenth
+  child onwards simply arrives with the group.
+*/
+.reveal-group > *:nth-child(1) {
+  --reveal-index: 0;
+}
+.reveal-group > *:nth-child(2) {
+  --reveal-index: 1;
+}
+.reveal-group > *:nth-child(3) {
+  --reveal-index: 2;
+}
+.reveal-group > *:nth-child(4) {
+  --reveal-index: 3;
+}
+.reveal-group > *:nth-child(5) {
+  --reveal-index: 4;
+}
+.reveal-group > *:nth-child(6) {
+  --reveal-index: 5;
+}
+.reveal-group > *:nth-child(7) {
+  --reveal-index: 6;
+}
+.reveal-group > *:nth-child(8) {
+  --reveal-index: 7;
+}
+.reveal-group > *:nth-child(9) {
+  --reveal-index: 8;
+}
+.reveal-group > *:nth-child(10) {
+  --reveal-index: 9;
+}
+.reveal-group > *:nth-child(11) {
+  --reveal-index: 10;
+}
+.reveal-group > *:nth-child(12) {
+  --reveal-index: 11;
+}
+
+/*
+  Panel exchange (src/components/ui/transition-panel.tsx). The entering panel
+  runs this keyframe; the leaving one keeps the transition its inline styles set.
+*/
+.panel-enter {
+  animation-name: panelEnter;
+  animation-duration: var(--panel-duration, 250ms);
+  animation-timing-function: var(--panel-ease, ease-in-out);
+  animation-fill-mode: both;
+}
+
+@keyframes panelEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+  Text shimmer (src/components/ui/text-shimmer.tsx). The glyphs are painted by a
+  moving gradient clipped to the text, so `color` must stay transparent — which
+  is also why the component's base colour is a prop rather than inherited.
+*/
+.text-shimmer {
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  background-size: 200% 100%;
+  background-repeat: repeat;
+  animation-name: textShimmer;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes textShimmer {
+  from {
+    background-position: 0% center;
+  }
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* Without `background-clip: text` the glyphs would be invisible, not unstyled. */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-shimmer {
+    background-image: none;
+    color: var(--shimmer-base, currentColor);
+  }
+}
+
+/*
+  Text shimmer wave (src/components/ui/text-shimmer-wave.tsx).
+
+  One keyframe for every character; the only per-character difference is
+  `animation-delay`, derived here from the character's index. That is what makes
+  the wave a pure data attribute rather than a timeline: `--wave-step` is the
+  delay between neighbours, so it *is* the wave's speed.
+
+  `background-size: 300% 100%` plus the inline gradient is the per-glyph light:
+  each character clips the same gradient to itself and sweeps it on the same
+  staggered clock as the roll, so the light travels with the wave instead of
+  across the whole word at once.
+
+  Three times the glyph, not the flat shimmer's two, and that difference is the
+  whole reason the label stays readable: position percentages move a background by
+  the *difference* between the image and the box, so a 2× gradient leaves half of
+  it in view at every instant — which for a per-character copy means every glyph is
+  permanently half-highlighted and the word reads as a pale smear. At 3× a glyph
+  shows a third of the gradient at a time, so it is solidly base-coloured except
+  for the moment the band crosses it.
+*/
+.text-shimmer-wave-char {
+  display: inline-block;
+  /* The characters include the spaces; without this the gaps collapse. */
+  white-space: pre;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  background-size: 300% 100%;
+  background-repeat: repeat;
+  animation-name: shimmerWave;
+  animation-duration: var(--wave-duration, 1s);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-delay: calc(var(--wave-step, 0.07s) * var(--wave-index, 0));
+}
+
+@keyframes shimmerWave {
+  0%,
+  100% {
+    transform: perspective(320px) translateZ(0) rotateY(0deg) scale(1);
+    background-position: 0% center;
+  }
+  50% {
+    transform: perspective(320px) translateZ(var(--wave-z, 4px))
+      rotateY(var(--wave-rotate, 18deg)) scale(var(--wave-scale, 1.08));
+    background-position: 100% center;
+  }
+}
+
+/* Same fallback as the flat shimmer: unstyled, not invisible. */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-shimmer-wave-char {
+    background-image: none;
+    color: var(--wave-base, currentColor);
+  }
+}
+
+/*
+  Glow halo (src/components/ui/glow-effect.tsx).
+
+  The blur is what turns a hard-edged gradient into a halo, so it lives on this
+  layer rather than behind an extra wrapper. `scale` sits below 1 by default so
+  the layer tucks in behind its host's edges and only the blurred bleed shows.
+
+  Both modes animate a single property (`background-position`, `opacity`), so
+  neither needs a registered custom property or an animation frame.
+*/
+.glow-effect {
+  filter: blur(var(--glow-blur, 18px));
+  transform: scale(var(--glow-scale, 0.95));
+  opacity: var(--glow-rest, 0.7);
+}
+
+.glow-effect-shift {
+  background-size: 200% 100%;
+  background-repeat: repeat;
+  animation: glowShift var(--glow-duration, 3s) linear infinite;
+}
+
+@keyframes glowShift {
+  from {
+    background-position: 0% center;
+  }
+  to {
+    background-position: 100% center;
+  }
+}
+
+.glow-effect-pulse {
+  animation: glowPulse var(--glow-duration, 3s) ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    opacity: var(--glow-rest, 0.7);
+  }
+  50% {
+    opacity: var(--glow-peak, 0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /*
+    Only the two revealed states are overridden: a group that never armed carries
+    no `data-in-view` state at all, and touching `.reveal-group > *` here would
+    override the children's own opacity/transform utilities.
+  */
+  .reveal-group[data-in-view='hidden'] > * {
+    opacity: 1;
+    transform: none;
+  }
+
+  .reveal-group[data-in-view='visible'] > *,
+  .panel-enter {
+    animation: none;
+  }
+
+  .text-shimmer {
+    animation: none;
+    background-image: none;
+    color: var(--shimmer-base, currentColor);
+  }
+
+  /*
+    The roll would be exactly the kind of motion this preference exists to stop,
+    so the glyphs are parked in their base colour rather than merely slowed.
+  */
+  .text-shimmer-wave-char {
+    animation: none;
+    background-image: none;
+    color: var(--wave-base, currentColor);
+    transform: none;
+  }
+
+  /*
+    The halo is *frozen*, not removed: it marks the one action that resolves a
+    broken state, and that mark is information. Only the movement goes.
+  */
+  .glow-effect-shift,
+  .glow-effect-pulse {
+    animation: none;
   }
 }

@@ -4,3 +4,7 @@
 __pycache__/
 *.pyc
 anaconda_projects/
+
+# Local toolchain state — never committed. `.runtime/` holds the project-local
+# Python used to run the API; see .freebuff/run.md for the procedure.
+.runtime/

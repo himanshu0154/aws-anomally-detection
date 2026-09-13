@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AppLogo from '@/components/ui/AppLogo';
 import { TextHoverEffect } from '@/components/ui/text-hover-effect';
+import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 
 /** Total time the splash stays on screen before handing over to the dashboard. */
 const SPLASH_DURATION_MS = 1900;
@@ -121,9 +122,28 @@ export default function SplashScreen({ connected, onDone }: SplashScreenProps) {
         </div>
 
         <p className="mt-3 text-xs font-medium text-foreground/90 font-tabular">
-          {connected
-            ? 'Backend connected — opening dashboard'
-            : 'Connecting to the SkyGuard AI backend…'}
+          {connected ? (
+            'Backend connected — opening dashboard'
+          ) : (
+            /*
+              The one thing the splash genuinely waits on. It carries the rolling
+              wave rather than the flat sweep: this is a whole sentence held on
+              screen for the length of a startup, not an inline status word, and
+              the roll gives that wait somewhere to travel — the wave front crosses
+              the line in about as long as the splash lasts.
+            */
+            <TextShimmerWave
+              baseColor="var(--foreground)"
+              highlightColor="var(--accent)"
+              duration={1}
+              spread={0.045}
+              zDistance={3}
+              scaleDistance={1.12}
+              rotateYDistance={22}
+            >
+              Connecting to the SkyGuard AI backend…
+            </TextShimmerWave>
+          )}
         </p>
 
         <button

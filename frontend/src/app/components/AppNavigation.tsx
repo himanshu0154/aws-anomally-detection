@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Clock, Menu, Wifi, X } from 'lucide-react';
 import AppLogo from '@/components/ui/AppLogo';
+import { AnimatedBackground } from '@/components/ui/animated-background';
 import { TextHoverEffect } from '@/components/ui/text-hover-effect';
+import { TextShimmer } from '@/components/ui/text-shimmer';
 import { NAV_ITEMS, isActivePath } from '@/lib/navigation';
 import { formatClock } from '@/lib/anomaly';
 
@@ -24,6 +26,8 @@ export default function AppNavigation({
 }: AppNavigationProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname() || '/';
+  // The route currently open drives the navigation highlight when nothing is hovered.
+  const activeHref = NAV_ITEMS.find((item) => isActivePath(pathname, item.href))?.href ?? null;
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -111,25 +115,36 @@ export default function AppNavigation({
             </span>
           </Link>
 
-          {/* Desktop navigation */}
-          <nav aria-label="Primary" className="hidden items-center gap-1 xl:flex">
-            {NAV_ITEMS.map((item) => {
-              const active = isActivePath(pathname, item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    active
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+          {/*
+            Desktop navigation. One highlight travels between the links instead of
+            each link carrying its own background; every link is `relative` so it
+            paints above the `behind` highlight.
+          */}
+          <nav aria-label="Primary" className="hidden xl:block">
+            <AnimatedBackground
+              containerClassName="flex items-center gap-1"
+              className="rounded-lg bg-primary/10"
+              value={activeHref}
+              enableHover
+              transition={{ duration: 0.35, type: 'spring', bounce: 0.2 }}
+            >
+              {NAV_ITEMS.map((item) => {
+                const active = isActivePath(pathname, item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    data-id={item.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={`relative rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </AnimatedBackground>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -147,7 +162,18 @@ export default function AppNavigation({
                 />
               </span>
               <span className={`text-xs font-medium ${online ? 'text-positive' : 'text-warning'}`}>
-                {online ? 'Station Online' : 'Reconnecting'}
+                {/* Reconnecting is a wait, not a status word: it shimmers while it lasts. */}
+                {online ? (
+                  'Station Online'
+                ) : (
+                  <TextShimmer
+                    baseColor="var(--warning)"
+                    highlightColor="#ffffff"
+                    duration={1.4}
+                  >
+                    Reconnecting
+                  </TextShimmer>
+                )}
               </span>
             </div>
 
@@ -210,42 +236,47 @@ export default function AppNavigation({
         </div>
 
         <nav aria-label="Main" className="flex-1 overflow-y-auto scrollbar-thin p-3">
-          <ul className="space-y-1">
+          {/* Same travelling highlight as the desktop nav, stacked instead of in a row. */}
+          <AnimatedBackground
+            containerClassName="flex flex-col gap-1"
+            className="rounded-lg bg-primary/10"
+            value={activeHref}
+            enableHover
+            transition={{ duration: 0.3 }}
+          >
             {NAV_ITEMS.map((item) => {
               const active = isActivePath(pathname, item.href);
               const Icon = item.icon;
               return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={`flex items-start gap-3 rounded-lg border p-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      active
-                        ? 'border-primary/40 bg-primary/10'
-                        : 'border-transparent hover:bg-muted'
-                    }`}
-                  >
-                    <Icon
-                      size={18}
-                      className={active ? 'mt-0.5 text-primary' : 'mt-0.5 text-muted-foreground'}
-                    />
-                    <span className="min-w-0">
-                      <span
-                        className={`block text-sm font-semibold ${
-                          active ? 'text-primary' : 'text-foreground'
-                        }`}
-                      >
-                        {item.label}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {item.description}
-                      </span>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  data-id={item.href}
+                  aria-current={active ? 'page' : undefined}
+                  className={`relative flex items-start gap-3 rounded-lg border p-3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    active ? 'border-primary/40' : 'border-transparent'
+                  }`}
+                >
+                  <Icon
+                    size={18}
+                    className={active ? 'mt-0.5 text-primary' : 'mt-0.5 text-muted-foreground'}
+                  />
+                  <span className="min-w-0">
+                    <span
+                      className={`block text-sm font-semibold ${
+                        active ? 'text-primary' : 'text-foreground'
+                      }`}
+                    >
+                      {item.label}
                     </span>
-                  </Link>
-                </li>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {item.description}
+                    </span>
+                  </span>
+                </Link>
               );
             })}
-          </ul>
+          </AnimatedBackground>
         </nav>
 
         <div className="border-t border-border px-5 py-4">

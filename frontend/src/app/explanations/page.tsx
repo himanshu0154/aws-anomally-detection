@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { AlertTriangle, CheckCheck, ListChecks } from 'lucide-react';
 import AnomalyEventCard from '../components/AnomalyEventCard';
 import PageHeader from '../components/PageHeader';
+import { AnimatedBackground } from '@/components/ui/animated-background';
+import { BorderTrail } from '@/components/ui/border-trail';
 import { CanvasText } from '@/components/ui/canvas-text';
+import { InView } from '@/components/ui/in-view';
+import { TransitionPanel } from '@/components/ui/transition-panel';
 import { EmptyBlock, LoadingBlock } from '../components/StateFeedback';
 import { HISTORY_LIMIT, useLiveDashboardData } from '@/hooks/useLiveDashboardData';
 import { useResolveAnomaly } from '@/hooks/useResolveAnomaly';
@@ -22,17 +26,22 @@ export default function ExplanationsPage() {
   const [view, setView] = useState<StatusView>('All');
   const [confirmingAll, setConfirmingAll] = useState(false);
 
-  // One list per status filter; the queue view never re-derives event contents.
+  // One list per status filter; a view's panel never re-derives event contents.
   const anomalyEvents = useMemo(() => sortForExplanations(history), [history]);
-  const visibleEvents = useMemo(
-    () => (view === 'All' ? anomalyEvents : anomalyEvents.filter((event) => event.status === view)),
-    [anomalyEvents, view]
-  );
   const activeEvents = useMemo(
     () => anomalyEvents.filter((event) => event.status === 'Active'),
     [anomalyEvents]
   );
+  const resolvedEvents = useMemo(
+    () => anomalyEvents.filter((event) => event.status === 'Resolved'),
+    [anomalyEvents]
+  );
   const resolvedCount = anomalyEvents.length - activeEvents.length;
+  const eventsByView: Record<StatusView, AnomalyEvent[]> = {
+    All: anomalyEvents,
+    Active: activeEvents,
+    Resolved: resolvedEvents,
+  };
 
   const handleResolveAll = async () => {
     setConfirmingAll(false);
@@ -64,28 +73,40 @@ export default function ExplanationsPage() {
             aria-label="Filter events by status"
             className="flex rounded-lg border border-border bg-card p-1"
           >
-            {VIEWS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setView(option)}
-                aria-pressed={view === option}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  view === option
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {option}
-                <span className="ml-1.5 font-tabular text-muted-foreground/80">
-                  {option === 'All'
-                    ? anomalyEvents.length
-                    : option === 'Active'
-                      ? activeEvents.length
-                      : resolvedCount}
-                </span>
-              </button>
-            ))}
+            {/*
+              The selected view is the highlight's resting place; hovering a
+              segment sends it there instead of each button painting its own
+              background. Segments are `relative` so they paint above it.
+            */}
+            <AnimatedBackground
+              containerClassName="flex"
+              className="rounded-md bg-primary/10"
+              value={view}
+              enableHover
+              transition={{ duration: 0.3 }}
+            >
+              {VIEWS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  data-id={option}
+                  onClick={() => setView(option)}
+                  aria-pressed={view === option}
+                  className={`relative rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    view === option ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {option}
+                  <span className="ml-1.5 font-tabular text-muted-foreground/80">
+                    {option === 'All'
+                      ? anomalyEvents.length
+                      : option === 'Active'
+                        ? activeEvents.length
+                        : resolvedCount}
+                  </span>
+                </button>
+              ))}
+            </AnimatedBackground>
           </div>
         </div>
 
@@ -126,7 +147,19 @@ export default function ExplanationsPage() {
       </div>
 
       {activeEvents.length > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-danger/40 bg-danger/5 px-5 py-3">
+        <div className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-danger/40 bg-danger/5 px-5 py-3">
+          {/*
+            The queue page's counterpart of the dashboard's alert trail: the queue
+            stays live until every event is resolved, so the border keeps a comet
+            travelling while anything is unresolved.
+          */}
+          <BorderTrail
+            className="bg-gradient-to-l from-danger/0 via-danger to-danger/0"
+            // The banner is a wide, short strip: keep the comet inside its height.
+            size={60}
+            duration={7}
+            radius="calc(var(--radius) + 0.25rem)"
+          />
           <AlertTriangle size={18} className="shrink-0 text-danger" />
           <p className="text-xs font-medium text-foreground">
             {activeEvents.length} unresolved{' '}
@@ -136,54 +169,77 @@ export default function ExplanationsPage() {
         </div>
       )}
 
-      {loading && history.length === 0 ? (
-        <LoadingBlock label="Loading stored anomaly events…" rows={4} />
-      ) : visibleEvents.length === 0 ? (
-        anomalyEvents.length === 0 ? (
-          <EmptyBlock
-            title="No anomalies detected yet"
-            message="The model is monitoring. As soon as a reading is flagged it will appear here as a persistent event, and it will stay here after the live reading returns to normal."
-            action={
-              <Link
-                href="/history"
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                View all stored readings
-              </Link>
-            }
-          />
-        ) : (
-          <EmptyBlock
-            title={`No ${view.toLowerCase()} anomalies`}
-            message={
-              view === 'Active'
-                ? 'Nothing is waiting for an operator right now.'
-                : 'No resolved anomalies in this session yet.'
-            }
-            action={
-              <button
-                type="button"
-                onClick={() => setView('All')}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                Show all events
-              </button>
-            }
-          />
-        )
-      ) : (
-        <ul className="space-y-4">
-          {visibleEvents.map((event: AnomalyEvent) => (
-            <li key={event.id}>
-              <AnomalyEventCard
-                event={event}
-                resolving={isResolving(event.id)}
-                onResolve={resolve}
+      {/*
+        The status views are panels: `TransitionPanel` keeps the outgoing list
+        mounted for the length of the exchange, so switching All / Active /
+        Resolved slides one list out and the next in instead of blinking.
+      */}
+      <TransitionPanel activeIndex={VIEWS.indexOf(view)} transition={{ duration: 0.22 }}>
+        {VIEWS.map((option) => {
+          const events = eventsByView[option];
+
+          if (loading && history.length === 0) {
+            return <LoadingBlock key={option} label="Loading stored anomaly events…" rows={4} />;
+          }
+
+          if (events.length === 0) {
+            return anomalyEvents.length === 0 ? (
+              <EmptyBlock
+                key={option}
+                title="No anomalies detected yet"
+                message="The model is monitoring. As soon as a reading is flagged it will appear here as a persistent event, and it will stay here after the live reading returns to normal."
+                action={
+                  <Link
+                    href="/history"
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    View all stored readings
+                  </Link>
+                }
               />
-            </li>
-          ))}
-        </ul>
-      )}
+            ) : (
+              <EmptyBlock
+                key={option}
+                title={`No ${option.toLowerCase()} anomalies`}
+                message={
+                  option === 'Active'
+                    ? 'Nothing is waiting for an operator right now.'
+                    : 'No resolved anomalies in this session yet.'
+                }
+                action={
+                  <button
+                    type="button"
+                    onClick={() => setView('All')}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    Show all events
+                  </button>
+                }
+              />
+            );
+          }
+
+          return (
+            <ul key={option} className="space-y-4">
+              {events.map((event: AnomalyEvent) => (
+                <li key={event.id}>
+                  {/*
+                    Each card is its own reveal group, so a long queue animates in
+                    as it is scrolled rather than all at once off the top.
+                  */}
+                  <InView>
+                    <AnomalyEventCard
+                      event={event}
+                      resolving={isResolving(event.id)}
+                      onResolve={resolve}
+                    />
+                  </InView>
+                </li>
+              ))}
+            </ul>
+          );
+        })}
+      </TransitionPanel>
 
       {/* Sits on the sky, not on a card — only `--foreground` clears AA there. */}
       {anomalyEvents.length > 0 && (

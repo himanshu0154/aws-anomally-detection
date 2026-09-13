@@ -1,6 +1,9 @@
-import React from 'react';
+'use client';
+
+import React, { useRef } from 'react';
 import Link from 'next/link';
 import { ArrowRight, BellRing, Brain, ChevronRight, Cpu, Radio, Search } from 'lucide-react';
+import { ScrollProgress } from '@/components/ui/scroll-progress';
 
 interface DetectionFlowDiagramProps {
   isWarmingUp: boolean;
@@ -11,6 +14,10 @@ export default function DetectionFlowDiagram({
   isWarmingUp,
   inferenceLatency,
 }: DetectionFlowDiagramProps) {
+  // The five stages overflow a narrow screen and there is nothing else on the card
+  // that hints at the ones off the right edge.
+  const railRef = useRef<HTMLDivElement>(null);
+
   const steps = [
     {
       id: 'flow-sensor',
@@ -70,33 +77,49 @@ export default function DetectionFlowDiagram({
         </Link>
       </div>
 
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin pb-2">
-        {steps.map((step, index) => {
-          const StepIcon = step.icon;
-          const isLast = index === steps.length - 1;
-          return (
-            <React.Fragment key={step.id}>
-              <div
-                className={`flex min-w-[92px] flex-col items-center gap-2 ${isLast ? 'anomaly-pulse' : ''}`}
-              >
+      <div className="relative">
+        <div
+          ref={railRef}
+          className="flex items-center gap-1 overflow-x-auto scrollbar-thin pb-2"
+        >
+          {steps.map((step, index) => {
+            const StepIcon = step.icon;
+            const isLast = index === steps.length - 1;
+            return (
+              <React.Fragment key={step.id}>
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-xl border ${step.bg}`}
+                  className={`flex min-w-[92px] flex-col items-center gap-2 ${isLast ? 'anomaly-pulse' : ''}`}
                 >
-                  <StepIcon size={20} className={step.color} />
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-xl border ${step.bg}`}
+                  >
+                    <StepIcon size={20} className={step.color} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs font-semibold leading-tight text-foreground">
+                      {step.label}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{step.sublabel}</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-xs font-semibold leading-tight text-foreground">
-                    {step.label}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{step.sublabel}</p>
-                </div>
-              </div>
-              {!isLast && (
-                <ChevronRight size={18} className="mx-1 shrink-0 text-muted-foreground" />
-              )}
-            </React.Fragment>
-          );
-        })}
+                {!isLast && (
+                  <ChevronRight size={18} className="mx-1 shrink-0 text-muted-foreground" />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        {/*
+          The rail scrolls horizontally on a narrow screen with no native
+          scrollbar to speak of, so the bar is the only hint that there are stages
+          off the right edge — and it hides itself on a screen wide enough to show
+          all five.
+        */}
+        <ScrollProgress
+          containerRef={railRef}
+          className="absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-primary/50"
+        />
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">

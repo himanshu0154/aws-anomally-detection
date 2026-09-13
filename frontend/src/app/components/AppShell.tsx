@@ -7,12 +7,13 @@ import AppNavigation from './AppNavigation';
 import CloudBackdrop from './CloudBackdrop';
 import SplashScreen from './SplashScreen';
 import { ErrorBlock } from './StateFeedback';
+import { Cursor } from '@/components/ui/cursor';
+import { ScrollProgress } from '@/components/ui/scroll-progress';
 import { DashboardDataProvider, useLiveDashboardData } from '@/hooks/useLiveDashboardData';
 
 /**
- * Global chrome: data provider, cloud backdrop, one-time splash, header/
- * navigation with the station board, connection banner, main content region and
- * footer.
+ * Global chrome: data provider, cloud backdrop, labelled cursor, one-time splash,
+ * header/navigation, connection banner, main content region and footer.
  *
  * The splash lives here rather than in a route so it plays exactly once per page
  * load — client-side navigation between pages never replays it.
@@ -34,6 +35,22 @@ function ShellChrome({
     // would paint over the `-z-10` cloud backdrop.
     <div className="flex min-h-screen flex-col text-foreground">
       <CloudBackdrop />
+
+      {/*
+        One labelled pointer for the whole app, mounted here so it exists on
+        every route. Surfaces opt in with a `data-cursor` label; everything else
+        keeps the native pointer.
+      */}
+      <Cursor />
+
+      {/*
+        How far through the page the reader is. It measures the document, so one
+        instance covers every route, and it hides itself on a page that does not
+        scroll rather than sitting there as a dead hairline. `z-[55]` is above the
+        sticky header (50) and below the drawer's scrim (60), so it rides the top
+        edge of the header without ever floating over an open dialog.
+      */}
+      <ScrollProgress className="fixed left-0 top-0 z-[55] h-0.5 w-full bg-[linear-gradient(to_right,transparent,var(--primary)_60%,var(--primary)_100%)]" />
 
       <a
         href="#main-content"

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ListFilter, Search, X } from 'lucide-react';
+import { BorderTrail } from '@/components/ui/border-trail';
 import {
   ANOMALY_TYPE_OPTIONS,
   DAY_OPTIONS,
@@ -41,6 +42,7 @@ export default function AnomalyFilterBar({
 }: AnomalyFilterBarProps) {
   const set = (patch: Partial<HistoryFilters>) => onChange({ ...filters, ...patch });
   const activeCount = countActiveFilters(filters);
+  const [searchFocused, setSearchFocused] = React.useState(false);
 
   return (
     <section aria-label="History filters" className="card-elevated p-5">
@@ -70,7 +72,18 @@ export default function AnomalyFilterBar({
         </div>
       </div>
 
-      <div className="relative mb-4">
+      <div className="relative mb-4 rounded-lg">
+        {/*
+          The trail marks the log as *actively* searched: it appears while the
+          field has focus, so a filtered log looks different from an idle one.
+        */}
+        <BorderTrail
+          active={searchFocused}
+          className="bg-gradient-to-l from-primary/0 via-primary to-primary/0"
+          // Shorter than the field is tall, so a lap never clips the comet.
+          size={40}
+          duration={5}
+        />
         <Search
           size={15}
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -79,6 +92,8 @@ export default function AnomalyFilterBar({
           type="search"
           value={filters.search}
           onChange={(event) => set({ search: event.target.value })}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
           placeholder="Search by ID, sensor, anomaly type, reading, explanation, date or severity…"
           aria-label="Search anomaly records"
           className="w-full rounded-lg border border-border bg-card py-2.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"

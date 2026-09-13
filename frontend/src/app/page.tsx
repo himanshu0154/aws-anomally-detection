@@ -15,6 +15,8 @@ import StationStatusBanner from './components/StationStatusBanner';
 import PageHeader from './components/PageHeader';
 import { LoadingBlock } from './components/StateFeedback';
 import { CanvasText } from '@/components/ui/canvas-text';
+import { useRevealGroup } from '@/components/ui/in-view';
+import { TextShimmerWave } from '@/components/ui/text-shimmer-wave';
 
 export default function DashboardPage() {
   const { live, series, history, unresolvedCount, loading, error } = useLiveDashboardData();
@@ -25,6 +27,12 @@ export default function DashboardPage() {
   const unresolvedEvents = useMemo(() => sortForExplanations(history), [history]);
   const latestOpenAnomaly = useMemo(() => latestUnresolved(history) ?? null, [history]);
   const recentAnomalies = history.filter((event) => event.status !== 'Normal').length;
+
+  // The three blocks that start below the fold reveal themselves on scroll; the
+  // live cards above them never animate in (see `in-view.tsx`).
+  const flowReveal = useRevealGroup<HTMLDivElement>({ stagger: 0.08 });
+  const analysisReveal = useRevealGroup<HTMLDivElement>({ stagger: 0.08 });
+  const sessionReveal = useRevealGroup<HTMLElement>({ stagger: 0.08 });
 
   return (
     <div className="space-y-6">
@@ -46,9 +54,35 @@ export default function DashboardPage() {
       {isWarmingUp && (
         <div className="flex items-center gap-3 rounded-xl border border-accent/50 bg-accent/5 px-5 py-3">
           <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+          {/*
+            This is the app's longest-running wait — up to 24 readings before the
+            detector is calibrated — and the one label a reader will look at more
+            than once, so it carries the rolling wave rather than the flat sweep.
+            The wave stays on the label only, never on the counts beside it: the
+            effect repaints glyphs, and a number someone has to read off must hold
+            still.
+          */}
           <p className="text-sm font-medium text-accent">
-            Warming up model — {warmupProgress}/24 readings collected. Anomaly detection is fully
-            calibrated after {Math.max(0, 24 - warmupProgress)} more readings.
+            <TextShimmerWave
+              /*
+                The light is `--primary`, not white. This banner is the palest
+                surface in the app (`bg-accent/5`), so a white highlight would not
+                read as a light crossing the glyphs — it would read as the glyphs
+                disappearing as the wave passed.
+              */
+              baseColor="var(--accent)"
+              highlightColor="var(--primary)"
+              duration={0.9}
+              spread={0.045}
+              zDistance={3}
+              scaleDistance={1.12}
+              rotateYDistance={22}
+            >
+              Warming up model
+            </TextShimmerWave>
+            {' — '}
+            {warmupProgress}/24 readings collected. Anomaly detection is fully calibrated after{' '}
+            {Math.max(0, 24 - warmupProgress)} more readings.
           </p>
         </div>
       )}
@@ -82,7 +116,12 @@ export default function DashboardPage() {
 
           <SensorChartSection series={series} />
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+          <div
+            ref={flowReveal.ref}
+            {...flowReveal.revealProps}
+            style={flowReveal.revealStyle}
+            className="reveal-group grid grid-cols-1 gap-6 lg:grid-cols-5"
+          >
             <div className="lg:col-span-3">
               <DetectionFlowDiagram
                 isWarmingUp={isWarmingUp}
@@ -94,7 +133,12 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div
+            ref={analysisReveal.ref}
+            {...analysisReveal.revealProps}
+            style={analysisReveal.revealStyle}
+            className="reveal-group grid grid-cols-1 gap-6 lg:grid-cols-2"
+          >
             <RootCauseClassification
               probabilities={live.root_cause_probabilities}
               detectedType={live.anomaly_type}
@@ -102,7 +146,13 @@ export default function DashboardPage() {
             <ExplanationRecommendation event={latestOpenAnomaly} />
           </div>
 
-          <section aria-labelledby="session-summary">
+          <section
+            ref={sessionReveal.ref}
+            {...sessionReveal.revealProps}
+            style={sessionReveal.revealStyle}
+            aria-labelledby="session-summary"
+            className="reveal-group"
+          >
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <div>
                 <h2 id="session-summary" className="text-base font-semibold text-foreground">

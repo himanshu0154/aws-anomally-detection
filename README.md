@@ -119,6 +119,16 @@ in-process store (5000 records) rolls over.
 - **Root-Cause Breakdown**: shared probability bars used by both the dashboard card and the root-cause page
 - **Anomaly Event Card**: full event view with the resolution workflow (inline confirmation for high-severity events)
 - **Anomaly History Table**: responsive table (desktop) / cards (mobile) with expandable details
+- **Travelling highlight**: one highlight surface follows the pointer (and keyboard focus) across the header navigation, the drawer, the dashboard quick links, the root-cause class tiles and the explanation queue's view switcher
+- **Border trail**: a comet that travels the border of a surface with something live behind it — the current anomaly, the unresolved queue and a focused history search
+- **Labelled cursor**: surfaces that opt in with `data-cursor` swap the OS pointer for a themed pointer plus a short action label (resolve, show details, open queue)
+- **Scroll reveal**: content that starts below the fold fades and rises in as it enters the viewport — a staggered group for a section's cards, one group per pipeline step, one per queued anomaly card. Live readings never animate in
+- **Panel transitions**: the explanation queue's status views and the alert card's details exchange panels with a slide, keeping the outgoing panel on screen while it leaves
+- **Text shimmer**: a light sweeps across short labels whose state is genuinely in flight — saving, reconnecting, LIVE
+- **Text shimmer wave**: the same light rolled character by character, for the app's longer waits — the model warm-up, the first backend fetch and the splash's connecting line
+- **Icon dock**: the footer's route list grows the icons nearest the pointer, with the label as a tooltip on a pointer device and inside the item itself on touch
+- **Glow halo**: a blurred, slowly drifting halo behind the Retry action in the connection banner — the one control that resolves a broken state
+- **Scroll progress**: a hairline at the top of the viewport that tracks how far through the page the reader is, and a matching rail under the dashboard's pipeline that tracks its horizontal scroll. Both hide themselves when there is nothing to scroll
 
 ## 🔧 Configuration
 
