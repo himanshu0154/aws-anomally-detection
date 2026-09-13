@@ -2,43 +2,49 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import type { SeriesPoint } from '@/hooks/useLiveDashboardData';
+import type { SeriesPoint } from '@/types/skyguard';
 
-const SensorChartClient = dynamic(
-  () => import('./SensorChartClient'),
-  { ssr: false }
-);
+const SensorChartClient = dynamic(() => import('./SensorChartClient'), { ssr: false });
 
 interface SensorChartSectionProps {
   series: SeriesPoint[];
 }
 
 export default function SensorChartSection({ series }: SensorChartSectionProps) {
+  const pressureSpan = (() => {
+    const values = series
+      .map((point) => point.pressure)
+      .filter((value): value is number => value != null);
+    if (values.length < 2) return null;
+    return Math.max(...values) - Math.min(...values);
+  })();
+
   return (
     <div className="card-elevated p-5">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-foreground">Real-Time Sensor Readings</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Last 40 hours — hourly readings — AWS-MH-042</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Last {series.length} readings
+            {pressureSpan != null && (
+              <> · pressure varies {pressureSpan.toFixed(1)} hPa across this window</>
+            )}
+          </p>
         </div>
-        <div className="flex items-center gap-4 text-xs">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-0.5 bg-danger inline-block rounded"></span>
-            <span className="text-muted-foreground">Temperature (°C)</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-0.5 bg-primary inline-block rounded"></span>
-            <span className="text-muted-foreground">Humidity (%)</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-0.5 bg-accent inline-block rounded"></span>
-            <span className="text-muted-foreground">Pressure (÷10 hPa)</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-danger border-2 border-white inline-block"></span>
-            <span className="text-danger font-medium">Anomaly</span>
-          </span>
-        </div>
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-3 rounded bg-danger" />
+            <span className="text-muted-foreground">Temperature (°C, left)</span>
+          </li>
+          <li className="flex items-center gap-1.5">
+           <span className="inline-block h-0.5 w-3 rounded bg-primary" />
+            <span className="text-muted-foreground">Humidity (%, left)</span>
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-3 rounded bg-accent" />
+            <span className="text-muted-foreground">Pressure (hPa, right)</span>
+          </li>
+        </ul>
       </div>
       <SensorChartClient data={series} />
     </div>

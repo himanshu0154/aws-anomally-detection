@@ -11,7 +11,7 @@ Deployment-ready backend:
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -118,7 +118,12 @@ detector: Optional[SkyGuardDetector] = None
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 BUFFER_SIZE = 24
-STATION_ID = "AWS-MH-042"
+# This deployment does not assert a station code: the dataset carries no station
+# column, so any identifier here would be invented. Kept as an empty string
+# rather than dropped so the response shape (and every consumer of `station_id`)
+# stays stable, and nothing in the UI renders it.
+STATION_ID = ""
+HISTORY_MAX = 5000   # bounded in-process event store; oldest records roll off first
 
 # ─── Pydantic models ─────────────────────────────────────────────────────────
 class SensorReading(BaseModel):
@@ -129,7 +134,7 @@ class SensorReading(BaseModel):
 
 # ─── Global state ─────────────────────────────────────────────────────────────
 reading_buffer: deque = deque(maxlen=BUFFER_SIZE)
-history_events: deque = deque(maxlen=500)  # anomaly events only
+history_events: deque = deque(maxlen=HISTORY_MAX)  # every processed reading: Normal / Active / Resolved
 _history_counter = 0
 all_readings: deque = deque(maxlen=1000)   # all readings for chart
 latest_event: Optional[Dict[str, Any]] = None
@@ -158,7 +163,7 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
     Feed a raw reading through the detector and return a canonical response.
     This is the single shared function used by both the simulator and POST /detect.
     """
-    global latest_event, _history_counter
+    global latest_event
 
     t0 = datetime.utcnow()
 
@@ -171,10 +176,11 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
 
     with _lock:
         reading_buffer.append(reading_dict)
+        recent_readings = list(reading_buffer)
 
-        engineered_row = _build_engineered_row(list(reading_buffer))
-        recent_temps_list = [r['T2M'] for r in list(reading_buffer) if r['T2M'] is not None]
-        recent_temps = np.array(recent_temps_list) if recent_temps_list else np.array([])
+        engineered_row = _build_engineered_row(recent_readings)
+        temps = [r['T2M'] for r in recent_readings if r['T2M'] is not None]
+        recent_temps = np.array(temps) if temps else np.array([])
 
         if detector is not None:
             result = detector.detect(engineered_row, recent_temps)
@@ -185,63 +191,29 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
                 'raw_reading': reading_dict, 'healed_reading': None
             }
 
-    # Build canonical response
-    canonical = _map_to_canonical(result, reading_dict)
+    # The canonical response is derived only from this reading's snapshot, never from live globals
+    canonical = _map_to_canonical(result, reading_dict, recent_readings)
 
-    # Call Gemini classifier if anomaly detected
-    gemini_classification = None
+    # Optional deep classification (Gemini) for anomalies only
+    canonical['gemini_classification'] = None
     if canonical['anomaly_status'] == 'anomaly' and classify_anomaly is not None:
         try:
-            with _lock:
-                recent = list(reading_buffer)
-            gemini_classification = classify_anomaly(
+            canonical['gemini_classification'] = classify_anomaly(
                 reading=reading_dict,
                 detector_result=result,
-                recent_readings=recent,
+                recent_readings=recent_readings,
             )
-            canonical['gemini_classification'] = gemini_classification
-        except Exception as e:
-            gemini_classification = None
+        except Exception:
             canonical['gemini_classification'] = None
-    else:
-        canonical['gemini_classification'] = None
 
-    # Record inference time
-    t1 = datetime.utcnow()
-    elapsed_ms = (t1 - t0).total_seconds() * 1000
-    with _lock:
-        _inference_times.append(round(elapsed_ms, 1))
+    elapsed_ms = round((datetime.utcnow() - t0).total_seconds() * 1000, 1)
 
-    # Store in history (only anomalies)
-        # Store in history (all readings, normal and anomaly)
+    # Register the reading as a persistent record and a chart point
     with _lock:
-        is_anomaly = canonical['anomaly_status'] == 'anomaly'
-        _history_counter += 1
-        history_events.appendleft({
-            'id': f"hist-{len(history_events) + 1:04d}",
-            'time': _format_time(canonical['timestamp']),
-            'date': _format_date(canonical['timestamp']),
-            'sensor': canonical['affected_sensor'] if is_anomaly else 'none',
-            'reading': _format_reading(canonical),
-            'type': _anomaly_type_label(canonical['anomaly_type']) if is_anomaly else 'Normal',
-            'raw_type': canonical['anomaly_type'],
-            'severity': canonical['severity'].capitalize(),
-            'status': 'Active' if is_anomaly else 'Normal',
-            'explanation': canonical['explanation'],
-            'recommendations': canonical['recommendations'],
-            'anomaly_score': canonical['anomaly_score'],
-            'corrected_value': canonical['corrected_value'],
-            'gemini_classification': gemini_classification,
-        })
-    # Store for chart
-    with _lock:
-        all_readings.append({
-            'time': _format_time_short(canonical['timestamp']),
-            'temp': canonical['temperature'],
-            'humidity': canonical['humidity'],
-            'pressureScaled': round(canonical['pressure'] / 10, 2) if canonical['pressure'] else None,
-            'anomaly': canonical['anomaly_status'] == 'anomaly',
-        })
+        _inference_times.append(elapsed_ms)
+        canonical['model_meta']['inference_latency_ms'] = round(float(np.mean(_inference_times)), 1)
+        history_events.appendleft(_build_history_record(canonical))
+        all_readings.append(_chart_point(canonical))
 
     latest_event = canonical
     return canonical
@@ -330,8 +302,17 @@ RECOMMENDATIONS_TABLE = {
 }
 
 
-def _map_to_canonical(result: Dict[str, Any], reading: Dict[str, Any]) -> Dict[str, Any]:
-    """Map detector.detect() output + raw reading to the canonical frontend schema."""
+def _map_to_canonical(
+    result: Dict[str, Any],
+    reading: Dict[str, Any],
+    recent_readings: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Map detector.detect() output + raw reading to the canonical frontend schema.
+
+    Pure: every input is an argument, so the response for a reading can never be
+    influenced by readings that arrive after it.
+    """
     ts = reading.get('timestamp', '')
     t2m = reading.get('T2M')
     rh2m = reading.get('RH2M')
@@ -363,7 +344,7 @@ def _map_to_canonical(result: Dict[str, Any], reading: Dict[str, Any]) -> Dict[s
     affected_sensor = _determine_affected_sensor(anomaly_type, raw_reading, z_scores)
 
     # explanation
-    explanation = _build_explanation(anomaly_type, result, reading)
+    explanation = _build_explanation(anomaly_type, result, reading, recent_readings)
 
     # corrected_value
     corrected_value = {'temperature': None, 'humidity': None, 'pressure': None}
@@ -377,19 +358,18 @@ def _map_to_canonical(result: Dict[str, Any], reading: Dict[str, Any]) -> Dict[s
 
     # root_cause_probabilities (heuristic visualization aid)
     root_cause_probs = _compute_root_cause_probabilities(
-        anomaly_type, confidence or 0, t2m, rh2m, ps, reading_buffer
+        anomaly_type, confidence or 0, t2m, rh2m, ps, recent_readings
     )
 
     # sensor_health
-    sensor_health = _compute_sensor_health(affected_sensor, reading_buffer)
+    sensor_health = _compute_sensor_health(affected_sensor, recent_readings)
 
     # recommendations
     recommendations = RECOMMENDATIONS_TABLE.get(anomaly_type, [])
 
     # readings in buffer
-    with _lock:
-        buf_len = len(reading_buffer)
-        warmed = buf_len >= BUFFER_SIZE
+    buf_len = len(recent_readings)
+    warmed = buf_len >= BUFFER_SIZE
 
     return {
         'station_id': STATION_ID,
@@ -412,6 +392,7 @@ def _map_to_canonical(result: Dict[str, Any], reading: Dict[str, Any]) -> Dict[s
         'model_meta': {
             'readings_in_buffer': buf_len,
             'fully_warmed_up': warmed,
+            'inference_latency_ms': None,  # filled in by run_detection once inference completes
             'algorithm': 'Isolation Forest + per-sensor residual regressors + rule-based thresholds',
         },
     }
@@ -442,7 +423,7 @@ def _determine_affected_sensor(anomaly_type, raw_reading, z_scores):
         return 'none'
 
 
-def _build_explanation(anomaly_type, result, reading):
+def _build_explanation(anomaly_type, result, reading, recent_readings):
     """Build a human-readable explanation string."""
     t2m = reading.get('T2M')
     reason = result.get('reason', '')
@@ -452,7 +433,14 @@ def _build_explanation(anomaly_type, result, reading):
         return 'No abnormal behaviour detected. All sensor readings are within expected ranges.'
 
     if anomaly_type == 'temperature_spike':
-        t2m_diff = abs(reading.get('T2M', 0) - (list(reading_buffer)[-2]['T2M'] if len(reading_buffer) >= 2 else reading.get('T2M', 0)))
+        previous = recent_readings[-2] if len(recent_readings) >= 2 else reading
+        current_t2m = reading.get('T2M')
+        previous_t2m = previous.get('T2M')
+        t2m_diff = (
+            abs(current_t2m - previous_t2m)
+            if current_t2m is not None and previous_t2m is not None
+            else 0.0
+        )
         return (
             f"Temperature changed suddenly (+{t2m_diff:.1f}°C vs previous reading). "
             f"The spike exceeds learned thresholds for the 24-hour rolling window. "
@@ -616,6 +604,14 @@ def _format_date(ts_str):
         return ts_str[:10] if len(ts_str) >= 10 else ts_str
 
 
+def _format_day(ts_str):
+    """Weekday name for the history filters: Monday ... Sunday."""
+    try:
+        return pd.to_datetime(ts_str).strftime('%A')
+    except Exception:
+        return ''
+
+
 def _format_time_short(ts_str):
     """Format timestamp for chart: HH:MM."""
     try:
@@ -649,6 +645,63 @@ def _format_reading(canonical):
 def _anomaly_type_label(anomaly_type):
     """Human-readable label for anomaly type."""
     return ANOMALY_TYPE_LABELS.get(anomaly_type, anomaly_type)
+
+
+# ─── Event construction ──────────────────────────────────────────────────────
+def _build_history_record(canonical: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build the canonical anomaly-event record for one processed reading.
+
+    Lifecycle contract (one record per reading, caller holds _lock):
+      * normal reading       -> status 'Normal',   resolved False  (terminal)
+      * anomaly reading      -> status 'Active',   resolved False  (only the operator resolves it)
+      * operator resolution  -> status 'Resolved', resolved True   (POST /api/history/{id}/resolve)
+
+    A later normal reading never rewrites the status of an earlier record, and IDs are
+    monotonically increasing, so an ID is never reused after the store rolls over.
+    """
+    global _history_counter
+    _history_counter += 1
+
+    is_anomaly = canonical['anomaly_status'] == 'anomaly'
+    ts = canonical['timestamp']
+
+    return {
+        'id': f'hist-{_history_counter:04d}',
+        'station_id': STATION_ID,
+        'timestamp': ts,
+        'date': _format_date(ts),
+        'day': _format_day(ts),
+        'time': _format_time(ts),
+        'sensor': canonical['affected_sensor'] if is_anomaly else 'none',
+        'reading': _format_reading(canonical),
+        'type': _anomaly_type_label(canonical['anomaly_type']) if is_anomaly else 'Normal',
+        'raw_type': canonical['anomaly_type'],
+        'severity': canonical['severity'].capitalize(),
+        'status': 'Active' if is_anomaly else 'Normal',
+        'explanation': canonical['explanation'],
+        'recommendations': list(canonical['recommendations']),
+        'anomaly_score': canonical['anomaly_score'],
+        'corrected_value': dict(canonical['corrected_value']),
+        'root_cause_probabilities': dict(canonical['root_cause_probabilities']),
+        'current_raw_reading': dict(canonical['raw_reading']),
+        'gemini_classification': canonical.get('gemini_classification'),
+        'resolved': False,
+        'resolved_at': None,
+    }
+
+
+def _chart_point(canonical: Dict[str, Any]) -> Dict[str, Any]:
+    """Chart point. `pressure` is the real hPa reading; `pressureScaled` is the legacy ÷10 view."""
+    pressure = canonical['pressure']
+    return {
+        'time': _format_time_short(canonical['timestamp']),
+        'temp': canonical['temperature'],
+        'humidity': canonical['humidity'],
+        'pressure': pressure,
+        'pressureScaled': round(pressure / 10, 2) if pressure is not None else None,
+        'anomaly': canonical['anomaly_status'] == 'anomaly',
+    }
 
 
 # ─── Background simulator ─────────────────────────────────────────────────────
@@ -740,11 +793,47 @@ def get_series(limit: int = Query(default=40, ge=1, le=200)):
 
 
 @app.get("/api/history")
-def get_history(limit: int = Query(default=50, ge=1, le=200)):
-    """Anomaly history (only anomaly events, from live detection session)."""
+def get_history(limit: int = Query(default=50, ge=1, le=500)):
+    """
+    Persistent session log of processed readings, newest first.
+
+    Each record is an event with an explicit lifecycle: `status` is one of
+    'Normal' | 'Active' | 'Resolved' and ships next to `resolved` / `resolved_at`,
+    so consumers never have to infer state from `raw_type` or the live reading.
+    """
     with _lock:
         items = list(history_events)[:limit]
-    return items
+        return [dict(item) for item in items]
+
+
+@app.post("/api/history/{event_id}/resolve")
+def resolve_history_event(event_id: str):
+    """
+    Mark a single anomaly event as resolved by the operator.
+
+    Idempotent: resolving an already-resolved event returns the stored record
+    unchanged. 400 if the record is a normal reading, 404 if the ID is unknown.
+    Never mutates any other record.
+    """
+    with _lock:
+        for record in history_events:
+            if record['id'] != event_id:
+                continue
+
+            if record['status'] == 'Normal':
+                raise HTTPException(
+                    status_code=400,
+                    detail=f'{event_id} is a normal reading and cannot be resolved',
+                )
+
+            if record['status'] != 'Resolved':
+                record['status'] = 'Resolved'
+                record['resolved'] = True
+                record['resolved_at'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+            return dict(record)
+
+    raise HTTPException(status_code=404, detail=f'Anomaly event {event_id} not found')
 
 
 @app.post("/detect")

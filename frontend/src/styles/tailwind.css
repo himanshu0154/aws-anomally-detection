@@ -19,9 +19,42 @@
     scroll-behavior: smooth;
   }
 
-  h1, h2, h3, h4, h5, h6, p {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
     margin: 0;
   }
+}
+
+/*
+  RGB triplets behind the Tailwind palette (`tailwind.config.js` composes these
+  into `rgb(... / <alpha-value>)`). The hex values below stay as they are for
+  `var(--x)` consumers; without the triplets every `/NN` opacity modifier in the
+  app compiles to nothing.
+*/
+:root {
+  --background-rgb: 244 242 232;
+  --foreground-rgb: 58 58 31;
+  --primary-rgb: 107 124 50;
+  --primary-foreground-rgb: 255 255 255;
+  --secondary-rgb: 232 228 208;
+  --secondary-foreground-rgb: 92 92 61;
+  --accent-rgb: 138 154 74;
+  --accent-foreground-rgb: 255 255 255;
+  --muted-rgb: 224 221 197;
+  --muted-foreground-rgb: 122 122 90;
+  --card-rgb: 250 248 239;
+  --card-foreground-rgb: 58 58 31;
+  --border-rgb: 201 197 160;
+  --input-rgb: 232 228 208;
+  --ring-rgb: 107 124 50;
+  --positive-rgb: 74 124 63;
+  --warning-rgb: 183 121 31;
+  --danger-rgb: 163 58 58;
 }
 
 :root {
@@ -55,7 +88,7 @@
 @layer utilities {
   .font-tabular {
     font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
+    font-feature-settings: 'tnum';
   }
 
   .card-surface {
@@ -98,8 +131,15 @@
   }
 
   @keyframes pulseRing {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.6; transform: scale(1.05); }
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1.05);
+    }
   }
 
   .anomaly-pulse {
@@ -107,8 +147,13 @@
   }
 
   @keyframes anomalyPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.4); }
-    50% { box-shadow: 0 0 0 8px rgba(248, 81, 73, 0); }
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgba(248, 81, 73, 0);
+    }
   }
 
   .online-dot {
@@ -116,24 +161,113 @@
   }
 
   @keyframes onlineBlink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
   }
 
   .flow-arrow {
     color: var(--muted-foreground);
   }
 
+  /*
+    Split-flap keyframes (src/components/ui/text-flipping-board.tsx).
+    The flip is CSS-driven so the board needs no animation library; each cell
+    remounts its flap element per step so the animation restarts.
+  */
+  @keyframes flapFoldTop {
+    from {
+      transform: rotateX(0deg);
+    }
+    to {
+      transform: rotateX(-100deg);
+    }
+  }
+
+  @keyframes flapRiseBottom {
+    from {
+      transform: rotateX(90deg);
+    }
+    to {
+      transform: rotateX(0deg);
+    }
+  }
+
+  @keyframes flapShadeOut {
+    from {
+      opacity: 0.5;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes flapShadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 0.6;
+    }
+  }
+
+  @keyframes flapShadeSoft {
+    from {
+      opacity: 0.4;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  /*
+    Fallback glyph size for split-flap cells. The component sets an inline
+    `calc(...cqw...)` derived from its own column count, which wins wherever
+    container queries are supported; this covers the rest.
+  */
+  .flap-cell-text {
+    font-size: clamp(6px, 2.4vw, 22px);
+  }
+
+  /*
+    Wordmark draw-on (src/components/ui/text-hover-effect.tsx). The dash length is
+    set per instance inline; this only names the keyframe and keeps the final
+    state. CSS animations beat inline styles, which is what lets one class trace
+    every outline regardless of the inline starting offset.
+  */
+  .wordmark-draw {
+    animation-name: wordmarkDraw;
+    animation-timing-function: ease-in-out;
+    animation-fill-mode: forwards;
+  }
+
+  @keyframes wordmarkDraw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wordmark-draw {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
+  }
+
   .gradient-temp {
-    background: linear-gradient(135deg, rgba(163, 58, 58, 0.10) 0%, rgba(244, 242, 232, 0) 60%);
+    background: linear-gradient(135deg, rgba(163, 58, 58, 0.1) 0%, rgba(244, 242, 232, 0) 60%);
   }
 
   .gradient-humidity {
-    background: linear-gradient(135deg, rgba(92, 122, 92, 0.10) 0%, rgba(244, 242, 232, 0) 60%);
+    background: linear-gradient(135deg, rgba(92, 122, 92, 0.1) 0%, rgba(244, 242, 232, 0) 60%);
   }
 
   .gradient-pressure {
-    background: linear-gradient(135deg, rgba(20, 184, 166, 0.10) 0%, rgba(244, 242, 232, 0) 60%);
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.1) 0%, rgba(244, 242, 232, 0) 60%);
   }
   .text-value-xl {
     font-size: 2.25rem;

@@ -1,28 +1,30 @@
 import React from 'react';
-import { Radio, Cpu, Brain, Search, BellRing, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, BellRing, Brain, ChevronRight, Cpu, Radio, Search } from 'lucide-react';
 
 interface DetectionFlowDiagramProps {
   isWarmingUp: boolean;
   inferenceLatency: number | null;
 }
 
-export default function DetectionFlowDiagram({ isWarmingUp, inferenceLatency }: DetectionFlowDiagramProps) {
+export default function DetectionFlowDiagram({
+  isWarmingUp,
+  inferenceLatency,
+}: DetectionFlowDiagramProps) {
   const steps = [
     {
       id: 'flow-sensor',
       icon: Radio,
       label: 'Sensor Data',
-      sublabel: 'Hourly readings',
-      status: isWarmingUp ? 'done' : 'done',
+      sublabel: 'T2M · RH2M · PS',
       color: 'text-accent',
       bg: 'bg-accent/10 border-accent/30',
     },
     {
       id: 'flow-processing',
       icon: Cpu,
-      label: 'Data Processing',
-      sublabel: 'Normalise + QC',
-      status: 'done',
+      label: 'Feature Build',
+      sublabel: 'Diffs + rolling',
       color: 'text-primary',
       bg: 'bg-primary/10 border-primary/30',
     },
@@ -30,17 +32,15 @@ export default function DetectionFlowDiagram({ isWarmingUp, inferenceLatency }: 
       id: 'flow-model',
       icon: Brain,
       label: 'AI/ML Model',
-      sublabel: 'IF + Residual',
-      status: 'done',
+      sublabel: 'Isolation Forest',
       color: 'text-primary',
       bg: 'bg-primary/10 border-primary/30',
     },
     {
       id: 'flow-detection',
       icon: Search,
-      label: 'Anomaly Detection',
-      sublabel: 'Learned thresholds',
-      status: 'done',
+      label: 'Detection',
+      sublabel: 'Rules + residuals',
       color: 'text-warning',
       bg: 'bg-warning/10 border-warning/30',
     },
@@ -49,61 +49,71 @@ export default function DetectionFlowDiagram({ isWarmingUp, inferenceLatency }: 
       icon: BellRing,
       label: 'Alert Issued',
       sublabel: isWarmingUp ? 'Warming up' : 'Monitoring',
-      status: isWarmingUp ? 'done' : 'active',
       color: isWarmingUp ? 'text-accent' : 'text-danger',
       bg: isWarmingUp ? 'bg-accent/10 border-accent/30' : 'bg-danger/10 border-danger/40',
     },
   ];
 
   return (
-    <div className="card-elevated p-5 h-full">
-      <h2 className="text-base font-semibold text-foreground mb-1">AI/ML Detection Pipeline</h2>
-      <p className="text-xs text-muted-foreground mb-5">Real-time inference path</p>
-      {/* Horizontal flow */}
+    <div className="card-elevated flex h-full flex-col p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">AI/ML Detection Pipeline</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Real-time inference path</p>
+        </div>
+        <Link
+          href="/how-model-works"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          How it works
+          <ArrowRight size={12} />
+        </Link>
+      </div>
+
       <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin pb-2">
-        {steps.map((step, idx) => {
+        {steps.map((step, index) => {
           const StepIcon = step.icon;
-          const isLast = idx === steps.length - 1;
+          const isLast = index === steps.length - 1;
           return (
             <React.Fragment key={step.id}>
-              <div className={`flex flex-col items-center gap-2 min-w-[96px] ${isLast && !isWarmingUp ? 'anomaly-pulse' : ''}`}>
+              <div
+                className={`flex min-w-[92px] flex-col items-center gap-2 ${isLast ? 'anomaly-pulse' : ''}`}
+              >
                 <div
-                  className={`w-12 h-12 rounded-xl border flex items-center justify-center ${step.bg}`}
+                  className={`flex h-12 w-12 items-center justify-center rounded-xl border ${step.bg}`}
                 >
                   <StepIcon size={20} className={step.color} />
                 </div>
                 <div className="text-center">
-                  <p className="text-xs font-semibold text-foreground leading-tight">{step.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{step.sublabel}</p>
+                  <p className="text-xs font-semibold leading-tight text-foreground">
+                    {step.label}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{step.sublabel}</p>
                 </div>
-                {step.status === 'done' && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full status-healthy">✓ Done</span>
-                )}
-                {step.status === 'active' && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full status-critical font-bold">ACTIVE</span>
-                )}
               </div>
               {!isLast && (
-                <ChevronRight size={18} className="text-muted-foreground shrink-0 mx-1" />
+                <ChevronRight size={18} className="mx-1 shrink-0 text-muted-foreground" />
               )}
             </React.Fragment>
           );
         })}
       </div>
-      {/* Model info footer */}
-      <div className="mt-5 pt-4 border-t border-border grid grid-cols-3 gap-3">
+
+      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
         <div>
           <p className="text-label-sm text-muted-foreground">Algorithm</p>
-          <p className="text-xs font-semibold text-foreground mt-0.5">Isolation Forest + Per-Sensor Residual Regressors</p>
+          <p className="mt-0.5 text-xs font-semibold text-foreground">
+            Isolation Forest + Per-Sensor Residual Regressors
+          </p>
         </div>
         <div>
-          <p className="text-label-sm text-muted-foreground">Training Window</p>
-          <p className="text-xs font-semibold text-foreground mt-0.5">24-hour rolling</p>
+          <p className="text-label-sm text-muted-foreground">Context window</p>
+          <p className="mt-0.5 text-xs font-semibold text-foreground">24 readings</p>
         </div>
         <div>
-          <p className="text-label-sm text-muted-foreground">Inference Latency</p>
-          <p className="text-xs font-semibold text-accent font-tabular mt-0.5">
-            {inferenceLatency != null ? `${inferenceLatency} ms` : '—'}
+          <p className="text-label-sm text-muted-foreground">Inference latency</p>
+          <p className="mt-0.5 font-tabular text-xs font-semibold text-accent">
+            {inferenceLatency != null ? `${inferenceLatency} ms (session mean)` : '—'}
           </p>
         </div>
       </div>

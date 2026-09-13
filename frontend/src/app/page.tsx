@@ -1,124 +1,140 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useLiveDashboardData } from '@/hooks/useLiveDashboardData';
-import DashboardHeader from './components/DashboardHeader';
+import { countByStatus, latestUnresolved, sortForExplanations } from '@/lib/anomaly';
+import AnomalyAlertCard from './components/AnomalyAlertCard';
+import DetectionFlowDiagram from './components/DetectionFlowDiagram';
+import ExplanationRecommendation from './components/ExplanationRecommendation';
+import QuickLinks from './components/QuickLinks';
+import RootCauseClassification from './components/RootCauseClassification';
+import SensorChartSection from './components/SensorChartSection';
+import SensorHealthCards from './components/SensorHealthCard';
 import SensorReadingsRow from './components/SensorReadingsRow';
 import StationStatusBanner from './components/StationStatusBanner';
-import AnomalyAlertCard from './components/AnomalyAlertCard';
-import SensorChartSection from './components/SensorChartSection';
-import DetectionFlowDiagram from './components/DetectionFlowDiagram';
-import SensorHealthCards from './components/SensorHealthCard';
-import RootCauseClassification from './components/RootCauseClassification';
-import AnomalyHistoryTable from './components/AnomalyHistoryTable';
-import ExplanationRecommendation from './components/ExplanationRecommendation';
-import { Toaster } from 'sonner';
+import PageHeader from './components/PageHeader';
+import { LoadingBlock } from './components/StateFeedback';
+import { CanvasText } from '@/components/ui/canvas-text';
 
-export default function AWSAnomalyDashboard() {
-  const { live, series, history, loading, error } = useLiveDashboardData();
+export default function DashboardPage() {
+  const { live, series, history, unresolvedCount, loading, error } = useLiveDashboardData();
 
-  const isWarmingUp = live.model_meta && !live.model_meta.fully_warmed_up;
-  const warmupProgress = live.model_meta ? live.model_meta.readings_in_buffer : 0;
+  const isWarmingUp = Boolean(live.model_meta && !live.model_meta.fully_warmed_up);
+  const warmupProgress = live.model_meta?.readings_in_buffer ?? 0;
+  const counts = useMemo(() => countByStatus(history), [history]);
+  const unresolvedEvents = useMemo(() => sortForExplanations(history), [history]);
+  const latestOpenAnomaly = useMemo(() => latestUnresolved(history) ?? null, [history]);
+  const recentAnomalies = history.filter((event) => event.status !== 'Normal').length;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            color: 'var(--foreground)',
-          },
-        }}
+    <div className="space-y-6">
+      {/*
+        The lede's promise — live data — carries the inline canvas text: it is the
+        one phrase on this screen that is about *now*, and the drifting lines read
+        as the data moving. Sized up so the wave strokes have something to cross.
+      */}
+      <PageHeader
+        title="SkyGuard AI"
+        subtitle={
+          <>
+            Operational command centre — what is happening{' '}
+            <CanvasText text="right now" className="text-xl font-bold" />, and what needs attention.
+          </>
+        }
       />
 
-      {/* Dashboard Header */}
-      <DashboardHeader
-        stationId={live.station_id || 'AWS-MH-042'}
-        lastUpdated={live.timestamp}
-        modelName={live.model_meta?.algorithm || 'Isolation Forest + residual regressors'}
-      />
-
-      {/* Warm-up banner */}
       {isWarmingUp && (
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-16 pt-4">
-          <div className="rounded-xl border border-accent/50 bg-accent/5 px-5 py-3 flex items-center gap-3">
-            <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-            <p className="text-sm text-accent font-medium">
-              Warming up model — {warmupProgress}/24 readings collected. Anomaly detection will be fully calibrated after {24 - warmupProgress} more readings.
-            </p>
-          </div>
+        <div className="flex items-center gap-3 rounded-xl border border-accent/50 bg-accent/5 px-5 py-3">
+          <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+          <p className="text-sm font-medium text-accent">
+            Warming up model — {warmupProgress}/24 readings collected. Anomaly detection is fully
+            calibrated after {Math.max(0, 24 - warmupProgress)} more readings.
+          </p>
         </div>
       )}
 
-      {/* Main content */}
-      <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-16 py-6 space-y-6">
-
-        {/* Row 1: Station Status Banner */}
-        <StationStatusBanner
-          overallStatus={live.overall_status}
-          sensorHealth={live.sensor_health}
-          history={history}
-          anomalyStatus={live.anomaly_status}
-          severity={live.severity}
-        />
-
-        {/* Row 2: Live Sensor Reading Cards */}
-        <SensorReadingsRow
-          temperature={live.temperature}
-          humidity={live.humidity}
-          pressure={live.pressure}
-          sensorHealth={live.sensor_health}
-          timestamp={live.timestamp}
-          series={series}
-        />
-
-        {/* Row 3: AI Anomaly Alert */}
-        <AnomalyAlertCard
-          live={live}
-          isWarmingUp={isWarmingUp}
-          history={history}
-        />
-
-        {/* Row 4: Real-Time Chart */}
-        <SensorChartSection series={series} />
-
-        {/* Row 5: Detection Flow + Sensor Health */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-3">
-            <DetectionFlowDiagram
-              isWarmingUp={isWarmingUp}
-              inferenceLatency={null}
-            />
-          </div>
-          <div className="lg:col-span-2">
-            <SensorHealthCards sensorHealth={live.sensor_health} />
-          </div>
-        </div>
-
-        {/* Row 6: Root Cause + Explanation + Recommendation */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <RootCauseClassification
-            probabilities={live.root_cause_probabilities}
-            detectedType={live.anomaly_type}
+      {loading && !live.timestamp ? (
+        <LoadingBlock label="Connecting to SkyGuard AI backend…" rows={4} />
+      ) : (
+        <>
+          <StationStatusBanner
+            overallStatus={live.overall_status}
+            sensorHealth={live.sensor_health}
+            unresolvedCount={unresolvedCount}
+            resolvedCount={counts.Resolved}
           />
-          <ExplanationRecommendation
-            explanation={live.explanation}
-            recommendations={live.recommendations}
-            correctedValue={live.corrected_value}
+
+          <SensorReadingsRow
+            temperature={live.temperature}
+            humidity={live.humidity}
+            pressure={live.pressure}
+            sensorHealth={live.sensor_health}
+            timestamp={live.timestamp}
+            series={series}
+          />
+
+          <AnomalyAlertCard
             live={live}
+            isWarmingUp={isWarmingUp}
+            unresolvedCount={unresolvedCount}
+            resolvedCount={counts.Resolved}
           />
-        </div>
 
-        {/* Row 7: Anomaly History Table */}
-        <AnomalyHistoryTable history={history} />
+          <SensorChartSection series={series} />
 
-      </main>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            <div className="lg:col-span-3">
+              <DetectionFlowDiagram
+                isWarmingUp={isWarmingUp}
+                inferenceLatency={live.model_meta?.inference_latency_ms ?? null}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <SensorHealthCards sensorHealth={live.sensor_health} />
+            </div>
+          </div>
 
-      <footer className="border-t border-border mt-10 py-4 px-8 text-center text-muted-foreground text-xs">
-        SkyGuard AI v2.4.1 — Algorithm: Isolation Forest + Per-Sensor Residual Regressors — Station AWS-MH-042 — All times UTC
-      </footer>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <RootCauseClassification
+              probabilities={live.root_cause_probabilities}
+              detectedType={live.anomaly_type}
+            />
+            <ExplanationRecommendation event={latestOpenAnomaly} />
+          </div>
+
+          <section aria-labelledby="session-summary">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 id="session-summary" className="text-base font-semibold text-foreground">
+                  This session
+                </h2>
+                {/*
+                  `text-foreground`, not `text-muted-foreground`: this caption sits
+                  directly on the blue sky rather than on a card, and only the
+                  foreground token clears AA against the deepest blue.
+                */}
+                <p className="mt-1 text-xs text-foreground">
+                  Latest {history.length} stored records · {counts.Active} active ·{' '}
+                  {counts.Resolved} resolved · {counts.Normal} normal
+                  {error && ' · showing last known data (backend unreachable)'}
+                </p>
+              </div>
+              <p className="text-xs text-foreground">
+                {recentAnomalies} anomalies in the loaded window
+              </p>
+            </div>
+            <QuickLinks
+              badges={{
+                '/explanations':
+                  unresolvedCount > 0
+                    ? `${unresolvedCount} to resolve`
+                    : `${unresolvedEvents.length} events`,
+                '/history': `${history.length} records`,
+              }}
+            />
+          </section>
+        </>
+      )}
     </div>
   );
 }

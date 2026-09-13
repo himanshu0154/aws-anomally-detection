@@ -66,10 +66,27 @@ The dashboard will be available at `http://localhost:4028`.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/` | Health check |
-| `GET` | `/api/live` | Latest canonical sensor reading |
-| `GET` | `/api/series?limit=40` | Time series data for charts |
-| `GET` | `/api/history?limit=50` | Anomaly event history |
-| `POST` | `/detect` | Manual anomaly detection |
+| `GET` | `/api/live` | Latest canonical sensor reading (current detection state) |
+| `GET` | `/api/series?limit=40` | Time series for charts. Each point carries raw `pressure` (hPa) plus the legacy `pressureScaled` (÷10) view |
+| `GET` | `/api/history?limit=50` | Persistent session event log, newest first (`limit` up to 500). Status is `Normal`, `Active` or `Resolved` |
+| `POST` | `/api/history/{event_id}/resolve` | Operator resolution: sets `Resolved` + `resolved_at`. Idempotent; `400` for a normal reading, `404` for an unknown id |
+| `POST` | `/detect` | Manual anomaly detection (shares the simulator's code path) |
+
+### Anomaly lifecycle
+
+Every processed reading becomes a persistent record, so an anomaly never disappears when the
+next reading is normal:
+
+```
+normal reading       -> status Normal    (terminal)
+anomaly detected     -> status Active    (stays Active until an operator resolves it)
+POST .../resolve     -> status Resolved  (never Normal) + resolved_at
+```
+
+Current detection state (`/api/live`) and event lifecycle (`/api/history`) are deliberately
+separate: a normal live reading never changes the status of a stored event. Event ids
+(`hist-0001`, `hist-0002`, …) are monotonic and never reused, so they stay stable even after the
+in-process store (5000 records) rolls over.
 
 ## 🎯 Features
 
@@ -80,16 +97,28 @@ The dashboard will be available at `http://localhost:4028`.
 - **Communication Errors**: Missing sensor data detection
 - **ML Anomalies**: Isolation Forest detection of unusual patterns
 
-### Dashboard Components
-- **Station Status Banner**: Overall system health indicator
-- **Sensor Reading Cards**: Live temperature, humidity, pressure values
-- **Anomaly Alert Card**: AI-powered anomaly notifications
-- **Real-Time Charts**: Historical sensor data visualization
-- **Detection Flow Diagram**: Pipeline status visualization
-- **Sensor Health Cards**: Per-sensor health monitoring
-- **Root Cause Classification**: Anomaly type probability breakdown
-- **Explanation & Recommendations**: AI-generated insights and actions
-- **Anomaly History Table**: Past anomaly events log
+### Pages
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Operational command centre: station status, live readings, current detection, real-time chart, sensor health, concise model / root-cause / explanation summaries, links to the deeper pages |
+| `/how-model-works` | The full detection pipeline explained in 12 steps, each with a plain-language section and expandable technical detail, plus an explicit "what this system does not claim" section |
+| `/root-cause` | Root-cause classes, live heuristic shares, the shares stored on the latest unresolved event, and the methodology (including the fact that drift has no dedicated signal) |
+| `/explanations` | Persistent anomaly queue: one card per event with its own explanation, corrected value, recommendations, root causes and a resolution checkbox |
+| `/history` | Searchable, filterable session log (day, date, time range, sensor, anomaly type, severity, status) with expandable event details |
+
+### Shell and components
+- **Splash screen**: one-time startup overlay (plays once per page load, never on internal navigation)
+- **App shell**: shared header, navigation drawer, connection banner, footer and the single 4-second polling provider
+- **Station Status Banner**: overall status, unresolved count, sensor integrity
+- **Sensor Reading Cards**: live values, trend vs previous reading and the range actually observed in the loaded window
+- **Anomaly Alert Card**: current detection only — it links to the explanation queue instead of substituting a past event
+- **Real-Time Chart**: temperature and humidity on the left axis, pressure in real hPa on a dedicated right axis
+- **Detection Flow Diagram**: pipeline card with measured inference latency
+- **Sensor Health Cards**: per-sensor health monitoring
+- **Root-Cause Breakdown**: shared probability bars used by both the dashboard card and the root-cause page
+- **Anomaly Event Card**: full event view with the resolution workflow (inline confirmation for high-severity events)
+- **Anomaly History Table**: responsive table (desktop) / cards (mobile) with expandable details
 
 ## 🔧 Configuration
 
@@ -102,7 +131,11 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 ### API Configuration
 
-The API automatically loads historical data from `data/demo_data.csv` for simulation. The simulation ticks every 3.5 seconds, feeding readings through the anomaly detection pipeline.
+The API automatically loads historical data from `data/test_processed.csv` for simulation. The simulation ticks every 3.5 seconds, feeding readings through the anomaly detection pipeline.
+
+The frontend dev server runs on port `4028` (`npm run dev`). Point it at the backend with
+`NEXT_PUBLIC_API_BASE_URL` (defaults to `http://localhost:8000` for local development); set the
+same variable in Vercel for production and the Render URL in `ALLOWED_ORIGINS` on the backend.
 
 ## 📁 Project Structure
 
@@ -120,13 +153,20 @@ The API automatically loads historical data from `data/demo_data.csv` for simula
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── components/  # React UI components
-│   │   │   ├── page.tsx     # Main dashboard page
-│   │   │   └── layout.tsx   # Root layout
+│   │   │   ├── components/            # React UI components (AppShell, navigation, cards, charts)
+│   │   │   ├── how-model-works/page.tsx
+│   │   │   ├── root-cause/page.tsx
+│   │   │   ├── explanations/page.tsx
+│   │   │   ├── history/page.tsx
+│   │   │   ├── page.tsx               # Dashboard
+│   │   │   └── layout.tsx             # Root layout -> AppShell
 │   │   ├── hooks/
-│   │   │   └── useLiveDashboardData.ts  # Data fetching hook
-│   │   └── styles/          # CSS styles
-│   └── package.json         # Node.js dependencies
+│   │   │   ├── useLiveDashboardData.tsx  # Single polling provider + consumer hook
+│   │   │   └── useResolveAnomaly.ts      # Resolution with operator feedback
+│   │   ├── lib/                       # api client, anomaly domain logic, navigation model
+│   │   ├── types/skyguard.ts          # Shared API contract types
+│   │   └── styles/                    # CSS styles
+│   └── package.json                   # Node.js dependencies
 ├── ml/
 │   ├── detector.py          # SkyGuardDetector class
 │   └── *.ipynb              # Jupyter notebooks

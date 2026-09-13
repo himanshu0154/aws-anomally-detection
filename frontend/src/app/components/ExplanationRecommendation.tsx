@@ -1,114 +1,202 @@
 import React from 'react';
-import { Brain, Wrench, AlertCircle, CheckCircle2 } from 'lucide-react';
-import type { LiveReading, Recommendation } from '@/hooks/useLiveDashboardData';
+import Link from 'next/link';
+import { AlertCircle, ArrowRight, Brain, CheckCircle2, Wrench } from 'lucide-react';
+import type { AnomalyEvent } from '@/types/skyguard';
+import {
+  STATUS_CLASS,
+  anomalyTypeLabel,
+  correctedValueFor,
+  observedRawValue,
+  sensorLabel,
+  severityLabel,
+} from '@/lib/anomaly';
 
-interface ExplanationRecommendationProps {
-  explanation: string;
-  recommendations: Recommendation[];
-  correctedValue: { temperature: number | null; humidity: number | null; pressure: number | null };
-  live: LiveReading;
+export function urgencyClass(urgency: string): string {
+  const value = urgency.toLowerCase();
+  if (value.includes('immediate')) return 'status-critical';
+  if (value.includes('hour') || value.includes('minute')) return 'status-warning';
+  return 'status-normal';
 }
 
-function buildWhyPoints(live: LiveReading): string[] {
+/**
+ * Why the model flagged this event. Built only from the stored event, so an older
+ * anomaly keeps the reasoning it was detected with.
+ */
+function buildWhyPoints(event: AnomalyEvent): string[] {
   const points: string[] = [];
-  if (live.explanation) {
-    points.push(live.explanation);
+  if (event.explanation) points.push(event.explanation);
+
+  if (event.raw_type === 'temperature_spike') {
+    points.push(
+      'Humidity and pressure remain within normal bounds — which points to a localised sensor fault rather than a genuine weather event.'
+    );
   }
-  if (live.anomaly_type === 'temperature_spike') {
-    points.push('Humidity and pressure remain within normal bounds — rules out genuine weather event.');
+  if (event.raw_type === 'communication_error') {
+    points.push('At least one sensor reported no value for this reading.');
   }
-  if (live.anomaly_score != null) {
-    points.push(`Confidence level: ${Math.round(live.anomaly_score)}%.`);
+  if (event.anomaly_score != null) {
+    points.push(`Model confidence at detection time: ${Math.round(event.anomaly_score)}%.`);
   }
-  if (live.affected_sensor && live.affected_sensor !== 'none') {
-    points.push(`Primary affected sensor: ${live.affected_sensor}.`);
+  if (event.sensor && event.sensor !== 'none') {
+    points.push(`Primary affected sensor: ${sensorLabel(event.sensor)}.`);
   }
   return points;
 }
 
-function urgencyClass(urgency: string): string {
-  if (urgency.toLowerCase().includes('immediate')) return 'status-critical';
-  if (urgency.toLowerCase().includes('hour')) return 'status-warning';
-  return 'status-normal';
-}
-
-export default function ExplanationRecommendation({ explanation, recommendations, correctedValue, live }: ExplanationRecommendationProps) {
-  const whyPoints = buildWhyPoints(live);
-
-  const correctedSensor = live.affected_sensor === 'temperature' ? 'temperature'
-    : live.affected_sensor === 'humidity' ? 'humidity'
-    : 'pressure';
-  const correctedUnit = correctedSensor === 'temperature' ? '°C' : correctedSensor === 'humidity' ? '%' : 'hPa';
-  const correctedVal = correctedValue[correctedSensor === 'temperature' ? 'temperature' : correctedSensor === 'humidity' ? 'humidity' : 'pressure'];
+/** Explanation, corrected value and recommended actions for one stored event. */
+export function ExplanationBody({
+  event,
+  maxRecommendations,
+  showCorrectedValue = true,
+}: {
+  event: AnomalyEvent;
+  maxRecommendations?: number;
+  showCorrectedValue?: boolean;
+}) {
+  const corrected = correctedValueFor(event);
+  const observed = observedRawValue(event);
+  const recommendations = maxRecommendations
+    ? event.recommendations.slice(0, maxRecommendations)
+    : event.recommendations;
 
   return (
-    <div className="card-elevated p-5">
-      <h2 className="text-base font-semibold text-foreground mb-1">Explanation & Recommendations</h2>
-      <p className="text-xs text-muted-foreground mb-4">Why the AI flagged this — and what to do next</p>
-      {/* Why flagged */}
-      <div className="p-3.5 rounded-lg bg-primary/5 border border-primary/20 mb-4">
+    <div className="space-y-4">
+      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5">
         <div className="flex items-start gap-2">
-          <Brain size={16} className="text-primary mt-0.5 shrink-0" />
+          <Brain size={16} className="mt-0.5 shrink-0 text-primary" />
           <div>
-            <p className="text-xs font-semibold text-primary mb-1.5">Why AI Flagged This</p>
+            <p className="mb-1.5 text-xs font-semibold text-primary">Why the AI flagged this</p>
             <ul className="space-y-1.5">
-              {whyPoints.map((point, i) => (
-                <li key={`why-${i}`} className="flex items-start gap-1.5 text-xs text-foreground/80">
-                  <CheckCircle2 size={12} className="text-primary mt-0.5 shrink-0" />
-                  {point}
+              {buildWhyPoints(event).map((point, index) => (
+                <li
+                  key={`why-${event.id}-${index}`}
+                  className="flex items-start gap-1.5 text-xs text-foreground/80"
+                >
+                  <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-primary" />
+                  <span>{point}</span>
                 </li>
               ))}
             </ul>
           </div>
         </div>
       </div>
-      {/* Estimated corrected value */}
-      {correctedVal != null && (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/5 border border-accent/20 mb-4">
-          <AlertCircle size={16} className="text-accent shrink-0" />
+
+      {showCorrectedValue && corrected && (
+        <div className="flex items-start gap-3 rounded-lg border border-accent/20 bg-accent/5 p-3">
+          <AlertCircle size={16} className="mt-0.5 shrink-0 text-accent" />
           <div>
-            <p className="text-xs font-semibold text-accent">Estimated Corrected Value</p>
-            <p className="text-xs text-foreground/70 mt-0.5">
-              Based on the 24h behaviour pattern, the expected {correctedSensor} reading is approximately{' '}
-              <span className="text-accent font-bold font-tabular">~{correctedVal.toFixed(1)} {correctedUnit}</span>.
-              {live.anomaly_status === 'anomaly' && (
-                (() => {
-                  const key = correctedSensor === 'temperature' ? 'T2M' : correctedSensor === 'humidity' ? 'RH2M' : 'PS';
-                  const rawVal = live.raw_reading?.[key as keyof typeof live.raw_reading];
-                  return rawVal != null ? (
-                    <> Current reading of <span className="text-danger font-bold">{rawVal.toFixed(1)} {correctedUnit}</span> differs from the predicted value.</>
-                  ) : null;
-                })()
+            <p className="text-xs font-semibold text-accent">Estimated corrected value</p>
+            <p className="mt-0.5 text-xs text-foreground/70">
+              Based on the rolling 24-reading pattern, the expected value for this event is
+              approximately{' '}
+              <span className="font-tabular font-bold text-accent">
+                ~{corrected.value.toFixed(1)} {corrected.unit}
+              </span>
+              {observed && (
+                <>
+                  , while the sensor reported{' '}
+                  <span className="font-tabular font-bold text-danger">
+                    {observed.value.toFixed(1)} {observed.unit}
+                  </span>
+                  .
+                </>
               )}
             </p>
           </div>
         </div>
       )}
-      {/* Recommended actions */}
+
       {recommendations.length > 0 && (
         <div>
-          <p className="text-label-sm text-muted-foreground mb-2.5">Recommended Actions</p>
+          <p className="text-label-sm mb-2.5 text-muted-foreground">Recommended actions</p>
           <div className="space-y-2">
-            {recommendations.map((rec) => (
+            {recommendations.map((recommendation) => (
               <div
-                key={`rec-${rec.priority}`}
-                className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 border border-border/60 group hover:bg-muted/40 transition-colors"
+                key={`rec-${event.id}-${recommendation.priority}`}
+                className="group flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 transition-colors hover:bg-muted/40"
               >
-                <div className="flex items-center justify-center w-5 h-5 rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0 mt-0.5">
-                  {rec.priority}
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                  {recommendation.priority}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-xs font-semibold text-foreground">{rec.action}</p>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${urgencyClass(rec.urgency)} font-medium`}>
-                      {rec.urgency}
+                <div className="min-w-0 flex-1">
+                  <div className="mb-0.5 flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-semibold text-foreground">{recommendation.action}</p>
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${urgencyClass(
+                        recommendation.urgency
+                      )}`}
+                    >
+                      {recommendation.urgency}
                     </span>
                   </div>
                 </div>
-                <Wrench size={13} className="text-muted-foreground shrink-0 mt-0.5 group-hover:text-foreground transition-colors" />
+                <Wrench
+                  size={13}
+                  className="mt-0.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                />
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Dashboard summary: the newest anomaly that no operator has resolved yet.
+ * The full list lives on /explanations.
+ */
+export default function ExplanationRecommendation({ event }: { event: AnomalyEvent | null }) {
+  return (
+    <div className="card-elevated flex h-full flex-col p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">
+            Explanation &amp; Recommendations
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Latest unresolved anomaly from the session log
+          </p>
+        </div>
+        <Link
+          href="/explanations"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          View all
+          <ArrowRight size={12} />
+        </Link>
+      </div>
+
+      {event ? (
+        <div className="flex-1 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-semibold text-foreground">
+              {event.id}
+            </span>
+            <span className="text-sm font-semibold text-foreground">
+              {anomalyTypeLabel(event.raw_type)}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                STATUS_CLASS[event.status]
+              }`}
+            >
+              {event.status}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {severityLabel(event.severity)} severity · {event.day} {event.date} {event.time} UTC
+            </span>
+          </div>
+          <ExplanationBody event={event} maxRecommendations={2} />
+        </div>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-6 py-8 text-center">
+          <CheckCircle2 size={22} className="text-positive" />
+          <p className="text-sm font-semibold text-foreground">No unresolved anomalies</p>
+          <p className="text-xs text-muted-foreground">
+            Every detected anomaly has been reviewed and resolved by an operator.
+          </p>
         </div>
       )}
     </div>

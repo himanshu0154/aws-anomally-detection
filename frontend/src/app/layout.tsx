@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Metadata, Viewport } from 'next';
 import { DM_Sans } from 'next/font/google';
+import AppShell from './components/AppShell';
 import '../styles/tailwind.css';
 
 const dmSans = DM_Sans({
@@ -24,12 +25,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={dmSans.variable}>
-      <body className={dmSans.className}>{children}</body>
+      <body className={dmSans.className}>
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }

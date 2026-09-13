@@ -1,77 +1,112 @@
 'use client';
-import React from 'react';
-import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import type { SeriesPoint } from '@/hooks/useLiveDashboardData';
+
+import React, { useMemo } from 'react';
+import {
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import type { SeriesPoint } from '@/types/skyguard';
 
 interface SensorChartClientProps {
   data: SeriesPoint[];
 }
 
-const CustomTooltip = ({ active, payload, label }: {
-  active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
-  label?: string;
-}) => {
-  if (active && payload && payload.length) {
-    const hasAnomaly = payload.some(
-      (p) => p.name === 'temp' && p.value !== null
-    );
-    // Find if this point has anomaly flag from the data
-    return (
-      <div
-        className="rounded-xl border p-3 text-xs shadow-2xl"
-        style={{
-          background: 'var(--card)',
-          borderColor: 'var(--border)',
-          minWidth: '160px',
-        }}
-      >
-        <p className="font-semibold text-foreground mb-2 font-tabular">{label} UTC</p>
-        {payload.map((entry) => (
-          <div
-            key={`tooltip-${entry.name}`}
-            className="flex items-center justify-between gap-4 mb-1"
-          >
-            <span style={{ color: entry.color }} className="font-medium capitalize">
-              {entry.name === 'temp' ? 'Temp'
-                : entry.name === 'humidity' ? 'Humidity' : 'Pressure×10'}
-            </span>
-            <span className="font-tabular font-semibold" style={{ color: entry.color }}>
-              {entry.value != null ? (
-                entry.name === 'temp'
-                  ? `${entry.value.toFixed(1)} °C`
-                  : entry.name === 'humidity'
-                  ? `${entry.value.toFixed(1)} %`
-                  : `${(entry.value * 10).toFixed(1)} hPa`
-              ) : 'N/A'}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
+/**
+ * Pressure is plotted in real hPa on its own axis.
+ *
+ * The old view divided pressure by 10 and shared the temperature/humidity axis: the
+ * real 3–27 hPa swings inside one window collapsed to well under 1% of the axis and
+ * read as a frozen line. A dedicated domain keeps every fluctuation visible without
+ * transforming the value, and the tooltip reports the hPa the sensor actually sent.
+ */
+const AXIS_DOMAIN_PADDING = 1.5;
+
+function pressureDomain(pressures: number[]): [number, number] {
+  if (pressures.length === 0) return [950, 1050];
+  const min = Math.min(...pressures);
+  const max = Math.max(...pressures);
+  if (max - min < AXIS_DOMAIN_PADDING) {
+    const centre = (min + max) / 2;
+    return [Math.floor(centre - 5), Math.ceil(centre + 5)];
   }
-  return null;
+  return [Math.floor(min - AXIS_DOMAIN_PADDING), Math.ceil(max + AXIS_DOMAIN_PADDING)];
+}
+
+const SERIES_LABELS: Record<string, string> = {
+  temp: 'Temperature',
+  humidity: 'Humidity',
+  pressure: 'Pressure',
 };
 
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number | null; color?: string }>;
+  label?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  return (
+    <div
+      className="rounded-xl border p-3 text-xs shadow-2xl"
+      style={{ background: 'var(--card)', borderColor: 'var(--border)', minWidth: '180px' }}
+    >
+      <p className="mb-2 font-tabular font-semibold text-foreground">{label} UTC</p>
+      {payload.map((entry) => {
+        const key = entry.name ?? '';
+        const unit = key === 'temp' ? '°C' : key === 'humidity' ? '%' : 'hPa';
+        return (
+          <div key={`tooltip-${key}`} className="mb-1 flex items-center justify-between gap-4">
+            <span style={{ color: entry.color }} className="font-medium">
+              {SERIES_LABELS[key] ?? key}
+            </span>
+            <span className="font-tabular font-semibold" style={{ color: entry.color }}>
+              {entry.value == null || Number.isNaN(entry.value)
+                ? 'N/A'
+                : `${entry.value.toFixed(1)} ${unit}`}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SensorChartClient({ data }: SensorChartClientProps) {
+  const domain = useMemo(
+    () =>
+      pressureDomain(
+        data.map((point) => point.pressure).filter((value): value is number => value != null)
+      ),
+    [data]
+  );
+
   if (!data || data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[340px] text-muted-foreground text-sm">
-        Waiting for data...
+      <div className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
+        Waiting for data…
       </div>
     );
   }
+
+  const tickStyle = {
+    fill: 'var(--muted-foreground)',
+    fontSize: 11,
+    fontFamily: 'var(--font-sans)',
+  };
 
   return (
     <ResponsiveContainer width="100%" height={340}>
-      <ComposedChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
-        <defs>
-          <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#991B1B" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="#991B1B" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-
+      <ComposedChart data={data} margin={{ top: 16, right: 8, left: 0, bottom: 8 }}>
         <CartesianGrid
           strokeDasharray="3 3"
           stroke="var(--border)"
@@ -81,21 +116,30 @@ export default function SensorChartClient({ data }: SensorChartClientProps) {
 
         <XAxis
           dataKey="time"
-          tick={{ fill: 'var(--muted-foreground)', fontSize: 11, fontFamily: 'var(--font-sans)' }}
+          tick={tickStyle}
           tickLine={false}
           axisLine={{ stroke: 'var(--border)' }}
           interval={Math.max(0, Math.floor(data.length / 8))}
         />
 
+        {/* Temperature + humidity share the left axis (both are °C / %) */}
+        <YAxis yAxisId="left" tick={tickStyle} tickLine={false} axisLine={false} width={40} />
+
+        {/* Pressure gets its own hPa axis so real fluctuations stay visible */}
         <YAxis
-          tick={{ fill: 'var(--muted-foreground)', fontSize: 11, fontFamily: 'var(--font-sans)' }}
+          yAxisId="pressure"
+          orientation="right"
+          domain={domain}
+          tick={tickStyle}
           tickLine={false}
           axisLine={false}
-          width={40}
+          width={52}
+          tickFormatter={(value: number) => `${value}`}
         />
 
         {/* Illustrative reference line — not a model threshold */}
         <ReferenceLine
+          yAxisId="left"
           y={38}
           stroke="var(--warning)"
           strokeDasharray="4 4"
@@ -112,40 +156,40 @@ export default function SensorChartClient({ data }: SensorChartClientProps) {
 
         <Tooltip content={<CustomTooltip />} />
 
-        {/* Pressure (scaled ÷10 for display) */}
         <Line
+          yAxisId="pressure"
           type="monotone"
-          dataKey="pressureScaled"
-          stroke="#166534"
-          strokeWidth={1.5}
+          dataKey="pressure"
+          stroke="var(--accent)"
+          strokeWidth={1.75}
           dot={false}
-          activeDot={{ r: 4, fill: '#166534' }}
-          name="pressureScaled"
-          strokeOpacity={0.8}
+          activeDot={{ r: 4, fill: 'var(--accent)' }}
+          name="pressure"
+          strokeOpacity={0.95}
           connectNulls
         />
 
-        {/* Humidity */}
         <Line
+          yAxisId="left"
           type="monotone"
           dataKey="humidity"
-          stroke="#2563EB"
+          stroke="var(--primary)"
           strokeWidth={1.5}
           dot={false}
-          activeDot={{ r: 4, fill: '#2563EB' }}
+          activeDot={{ r: 4, fill: 'var(--primary)' }}
           name="humidity"
           strokeOpacity={0.9}
           connectNulls
         />
 
-        {/* Temperature */}
         <Line
+          yAxisId="left"
           type="monotone"
           dataKey="temp"
-          stroke="#991B1B"
+          stroke="var(--danger)"
           strokeWidth={2.5}
           dot={false}
-          activeDot={{ r: 5, fill: '#991B1B' }}
+          activeDot={{ r: 5, fill: 'var(--danger)' }}
           name="temp"
           connectNulls
         />

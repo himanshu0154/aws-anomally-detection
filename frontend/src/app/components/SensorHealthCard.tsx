@@ -1,6 +1,13 @@
 import React from 'react';
-import { Thermometer, Droplets, Gauge, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
-import type { SensorHealth } from '@/hooks/useLiveDashboardData';
+import {
+  Thermometer,
+  Droplets,
+  Gauge,
+  AlertCircle,
+  CheckCircle,
+  AlertTriangle,
+} from 'lucide-react';
+import type { SensorHealth } from '@/types/skyguard';
 
 interface SensorHealthCardsProps {
   sensorHealth: Record<string, SensorHealth>;
@@ -46,15 +53,19 @@ export default function SensorHealthCards({ sensorHealth }: SensorHealthCardsPro
             <div
               key={key}
               className={`p-3 rounded-lg border ${
-                isCritical ? 'bg-danger/5 border-danger/30'
-                  : isWarning ? 'bg-warning/5 border-warning/30'
-                  : 'bg-muted/30 border-border/60'
+                isCritical
+                  ? 'bg-danger/5 border-danger/30'
+                  : isWarning
+                    ? 'bg-warning/5 border-warning/30'
+                    : 'bg-muted/30 border-border/60'
               }`}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Icon size={15} className={iconColor} />
-                  <span className="text-xs font-semibold text-foreground">{health.label || key}</span>
+                  <span className="text-xs font-semibold text-foreground">
+                    {health.label || key}
+                  </span>
                 </div>
                 {isCritical ? (
                   <span className="flex items-center gap-1 text-xs status-critical px-1.5 py-0.5 rounded-full font-semibold">
