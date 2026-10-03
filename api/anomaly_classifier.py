@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # ─── Configuration ────────────────────────────────────────────────────────────
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_ENABLED = os.getenv("GEMINI_ENABLED", "true").lower() == "true"
 
 # Known anomaly categories from the detection pipeline
@@ -42,6 +42,43 @@ Your job is to analyze sensor readings that have already been flagged as anomalo
 
 The Isolation Forest model detects whether a sensor pattern is unusual, but it does not always know what the anomaly represents. Your task is to analyze the anomalous readings, compare them with the provided known anomaly categories and contextual information, and classify the anomaly.
 
+LANGUAGE AND EVIDENCE RULES:
+
+- Use only claims directly supported by the provided sensor data.
+- Do not exaggerate the magnitude or importance of a change.
+- Do not use words such as "abrupt", "sharp", "severe", "extreme", "dramatic", "heavily", or "significant" unless the provided data explicitly supports that characterization.
+- Prefer simple descriptions over detailed numerical descriptions.
+- Include exact numbers only when they are necessary to explain why the anomaly was detected.
+- Do not list starting and ending values unless they are important for understanding the anomaly.
+- Example: say "temperature decreased noticeably" rather than listing both the previous and current temperature.
+- Do not describe a pattern as unusual solely because it is an anomaly detected by Isolation Forest.
+- Isolation Forest indicates that a pattern is statistically unusual; it does not prove that the change is physically extreme.
+- Do not infer a weather event unless the sensor data provides strong evidence.
+- Do not infer sensor failure unless the sensor pattern provides evidence for it.
+- Clearly distinguish between observed facts and possible explanations.
+- When evidence is limited, explicitly say that the cause cannot be determined from the available readings.
+
+EXPLANATION STYLE:
+
+- Write explanations for a general operator, not a data scientist.
+- Keep the explanation to 1–2 short sentences.
+- Clearly explain what changed and why the model flagged the reading.
+- Use simple, natural language.
+- Do not list multiple sensor values unless they are necessary.
+- Do not repeat information that is already displayed elsewhere in the interface, such as confidence, severity, or primary affected sensor.
+- Avoid technical phrases such as "statistically rare multivariate shift".
+- Prefer phrases such as "the combination of sensor changes was unusual compared with recent readings."
+- Do not exaggerate the severity of changes.
+- Do not use dramatic words such as "sharp", "extreme", "dramatic", "heavily", or "abrupt".
+- Do not claim that a sensor is faulty unless there is evidence of sensor malfunction.
+
+POSSIBLE CAUSE RULES:
+
+- Only provide a possible cause when there is reasonable evidence for it.
+- If the data does not distinguish between environmental variation and sensor behavior, say "Cause cannot be determined from the available readings."
+- Do not list multiple speculative causes.
+- Do not present a possible cause as a confirmed fact.
+
 ANALYSIS REQUIREMENTS:
 
 1. Determine whether the anomalous reading appears to correspond to one of the known anomaly categories.
@@ -59,7 +96,16 @@ ANALYSIS REQUIREMENTS:
    - previously unseen patterns
 8. Do not claim that a specific weather event occurred unless the available sensor data provides reasonable evidence for it.
 9. Provide a confidence score from 0–100 based on the available evidence.
-10. Give a concise explanation that can be displayed directly to a user.
+10. Give a concise, neutral explanation based strictly on the available evidence.
+
+RECOMMENDATION RULES:
+
+- Recommendations must be directly related to the observed sensor behavior.
+- Do not recommend investigating a specific weather event unless the data provides evidence for that event.
+- Prefer practical sensor verification actions such as checking subsequent readings, comparing with nearby stations, or checking sensor calibration.
+
+
+
 
 IMPORTANT:
 - Never invent sensor measurements.
@@ -107,8 +153,17 @@ def _get_model():
         logger.info(f"Gemini classifier initialized: model={GEMINI_MODEL}")
         return _model
     except Exception as e:
-        logger.error(f"Failed to initialize Gemini: {e}")
-        return None
+        print(f"Gemini classification failed: {e}")
+        return {
+            "status": "Anomaly",
+            "category": "Unknown/Uncategorized Anomaly",
+            "classification": "Unknown/Uncategorized",
+            "confidence": 0,
+            "severity": "Medium",
+            "explanation": "The anomaly was detected by the Isolation Forest model. Gemini analysis is temporarily unavailable.",
+            "possible_cause": "Cause cannot be determined from the available readings.",
+            "recommended_action": "Continue monitoring the sensor readings and verify the affected sensor if the anomaly persists."
+        }
 
 
 # ─── Classification ───────────────────────────────────────────────────────────
@@ -222,5 +277,5 @@ Classify this anomaly and return the JSON response."""
         logger.error(f"Gemini classification failed: {e}")
         return {
             **DEFAULT_CLASSIFICATION,
-            "explanation": f"Gemini API error: {str(e)[:200]}. Using IF detection only.",
+            "explanation": "The anomaly was detected by the Isolation Forest model. Gemini analysis is temporarily unavailable.",
         }

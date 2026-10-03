@@ -27,8 +27,38 @@ def _clamp(target, value):
     lo, hi = VALID_RANGES[target]
     return max(lo, min(hi, value))
 
+def _get_severity(value, threshold):
+    ratio = value / threshold
+
+    if ratio < 1.25:
+        return 'low'
+    elif ratio < 2.0:
+        return 'medium'
+    else:
+        return 'high'
+
+
+def _get_frozen_severity(std):
+    if std >= 0.03:
+        return 'low'
+    elif std >= 0.01:
+        return 'medium'
+    else:
+        return 'high'
+    
+
 
 class SkyGuardDetector:
+    def _get_ml_severity(self, score):
+        strength = abs(score) / abs(self.if_score_min)
+
+        if strength < 0.33:
+            return 'low'
+        elif strength < 0.66:
+            return 'medium'
+        else:
+            return 'high'
+        
     def __init__(self, model, features, resid_models, resid_stds, multi_predictors,
                  multi_threshold=17.0757, if_score_min=-0.09150155162021423, if_score_max=0.1269836965997279):
         self.model = model
@@ -88,7 +118,7 @@ class SkyGuardDetector:
             return {
                 'status': 'anomaly',
                 'type': 'temperature_spike',
-                'severity': 'high',
+                'severity' : _get_severity(abs(row['T2M_diff']), 8),
                 'confidence': confidence,
                 'reason': 'Temperature changed suddenly',
                 'raw_reading': raw_reading,
@@ -102,7 +132,7 @@ class SkyGuardDetector:
                 return {
                     'status': 'anomaly',
                     'type': 'temperature_frozen',
-                    'severity': 'medium',
+                    'severity': _get_frozen_severity(recent_std),
                     'confidence': confidence,
                     'reason': 'Temperature barely changed for 6 readings',
                     'raw_reading': raw_reading,
@@ -124,7 +154,7 @@ class SkyGuardDetector:
             return {
                 'status': 'anomaly',
                 'type': 'multivariate_inconsistency',
-                'severity': 'medium',
+                'severity': _get_severity(multi_score, self.multi_threshold),
                 'confidence': confidence,
                 'reason': 'Sensor readings individually normal but jointly inconsistent',
                 'raw_reading': raw_reading,
@@ -148,7 +178,7 @@ class SkyGuardDetector:
             return {
                 'status': 'anomaly',
                 'type': 'ml_anomaly',
-                'severity': 'medium',
+                'severity': self._get_ml_severity(score),
                 'confidence': confidence,
                 'reason': 'Unusual weather-sensor pattern detected',
                 'raw_reading': raw_reading,

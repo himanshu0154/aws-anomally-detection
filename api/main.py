@@ -206,6 +206,21 @@ def run_detection(raw_reading: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             canonical['gemini_classification'] = None
 
+    if canonical['gemini_classification']:
+        gemini = canonical['gemini_classification']
+
+        if gemini.get('explanation'):
+            canonical['explanation'] = gemini['explanation']
+
+        if gemini.get('recommended_action'):
+            canonical['recommendations'] = [
+                {
+                    'priority': 1,
+                    'action': gemini['recommended_action'],
+                    'urgency': 'Immediate' if canonical['severity'] == 'high' else 'Within 1 hour'
+                }
+            ]
+
     elapsed_ms = round((datetime.utcnow() - t0).total_seconds() * 1000, 1)
 
     # Register the reading as a persistent record and a chart point
